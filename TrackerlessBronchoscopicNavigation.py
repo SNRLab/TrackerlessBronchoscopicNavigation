@@ -17,7 +17,7 @@ class TrackerlessBronchoscopicNavigation(ScriptedLoadableModule):
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "Trackerless Bronchoscopic Navigation"
-    self.parent.categories = ["Filtering"]
+    self.parent.categories = ["Navigation"]
     self.parent.dependencies = []
     self.parent.contributors = ["Franklin King, Megha Kalia"]
     self.parent.helpText = """
@@ -41,12 +41,16 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
   def __init__(self, parent=None):
     ScriptedLoadableModuleWidget.__init__(self, parent)
     self.stepCount = 0
+    self.stepTimer = qt.QTimer()
+    self.stepTimer.timeout.connect(self.onStepImage)
 
   def cleanup(self):
-    self.stepCount = 0
+    self.stepTimer.stop()
+    self.onResetStepCount()
 
   def onReload(self,moduleName="TrackerlessBronchoscopicNavigation"):
-    self.stepCount = 0
+    self.stepTimer.stop()
+    self.onResetStepCount()
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)    
 
   def setup(self):
@@ -59,14 +63,14 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.IOCollapsibleButton)
     IOLayout = qt.QFormLayout(self.IOCollapsibleButton)
 
-    self.inputImageSelector = slicer.qMRMLNodeComboBox()
-    self.inputImageSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.inputImageSelector.selectNodeUponCreation = False
-    self.inputImageSelector.noneEnabled = False
-    self.inputImageSelector.addEnabled = True
-    self.inputImageSelector.removeEnabled = True
-    self.inputImageSelector.setMRMLScene(slicer.mrmlScene)
-    IOLayout.addRow("Camera Image: ", self.inputImageSelector)
+    # self.inputImageSelector = slicer.qMRMLNodeComboBox()
+    # self.inputImageSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    # self.inputImageSelector.selectNodeUponCreation = False
+    # self.inputImageSelector.noneEnabled = True
+    # self.inputImageSelector.addEnabled = True
+    # self.inputImageSelector.removeEnabled = True
+    # self.inputImageSelector.setMRMLScene(slicer.mrmlScene)
+    # IOLayout.addRow("Camera Image: ", self.inputImageSelector)
 
     self.inputTransformSelector = slicer.qMRMLNodeComboBox()
     self.inputTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
@@ -74,7 +78,7 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
     self.inputTransformSelector.noneEnabled = False
     self.inputTransformSelector.addEnabled = True
     self.inputTransformSelector.removeEnabled = True
-    self.inputImageSelector.setMRMLScene(slicer.mrmlScene)
+    self.inputTransformSelector.setMRMLScene(slicer.mrmlScene)
     IOLayout.addRow("Camera Transform: ", self.inputTransformSelector)    
 
     # Step mode collapsible button
@@ -84,65 +88,170 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.stepModeCollapsibleButton)
     stepModeLayout = qt.QFormLayout(self.stepModeCollapsibleButton)
 
-    self.outputPathBox = qt.QLineEdit("D:/MeghaData/predictions/dataset_14/keyframe_1")
-    self.outputPathBox.setReadOnly(True)
-    self.outputPathButton = qt.QPushButton("...")
-    self.outputPathButton.clicked.connect(self.select_directory)
-    pathBoxLayout = qt.QHBoxLayout()
-    pathBoxLayout.addWidget(self.outputPathBox)
-    pathBoxLayout.addWidget(self.outputPathButton)
-    stepModeLayout.addRow(pathBoxLayout)
+    self.predPathBox = qt.QLineEdit("D:/MeghaData/predictions")
+    self.predPathBox.setReadOnly(True)
+    self.predPathButton = qt.QPushButton("...")
+    self.predPathButton.clicked.connect(self.select_directory_pred)
+    predPathBoxLayout = qt.QHBoxLayout()
+    predPathBoxLayout.addWidget(self.predPathBox)
+    predPathBoxLayout.addWidget(self.predPathButton)
+    stepModeLayout.addRow(predPathBoxLayout)
+
+    self.loadPredButton = qt.QPushButton("Load Predictions")
+    stepModeLayout.addWidget(self.loadPredButton)
+    self.loadPredButton.connect('clicked()', self.onLoadPred)
+
+    self.gtCheckBox = qt.QCheckBox("Use Ground Truth Data")
+    self.gtCheckBox.setChecked(False)
+    stepModeLayout.addWidget(self.gtCheckBox)
+
+    self.gtPathBox = qt.QLineEdit("D:/MeghaData/predictions/dataset_14/keyframe_1")
+    self.gtPathBox.setReadOnly(True)
+    self.gtPathButton = qt.QPushButton("...")
+    self.gtPathButton.clicked.connect(self.select_directory_gt)
+    gtPathBoxLayout = qt.QHBoxLayout()
+    gtPathBoxLayout.addWidget(self.gtPathBox)
+    gtPathBoxLayout.addWidget(self.gtPathButton)
+    stepModeLayout.addRow(gtPathBoxLayout)
 
     self.stepButton = qt.QPushButton("Step Image")
-    stepModeLayout.addWidget(self.unwrapImageButton)
+    stepModeLayout.addWidget(self.stepButton)
     self.stepButton.connect('clicked()', self.onStepImage)
+
+    self.resetStepButton = qt.QPushButton("Reset Step Count")
+    stepModeLayout.addWidget(self.resetStepButton)
+    self.resetStepButton.connect('clicked()', self.onResetStepCount)
 
     self.stepLabel = qt.QLabel("0")
     stepModeLayout.addWidget(self.stepLabel)
 
-    self.resetStepButton = qt.QPushButton("Reset Step Count")
-    stepModeLayout.addWidget(self.unwrapImageButton)
-    self.stepButton.connect('clicked()', self.onResetStepCount)
+    self.stepTimerButton = qt.QPushButton("Step Timer")
+    self.stepTimerButton.setCheckable(True)
+    stepModeLayout.addWidget(self.stepTimerButton)
+    self.stepTimerButton.connect('clicked()', self.onStepTimer)
 
-  def select_directory(self):
+    self.stepFPSBox = qt.QSpinBox()
+    self.stepFPSBox.setSingleStep(1)
+    self.stepFPSBox.setMaximum(144)
+    self.stepFPSBox.setMinimum(1)
+    self.stepFPSBox.setSuffix(" FPS")
+    self.stepFPSBox.value = 10
+    stepModeLayout.addWidget(self.stepFPSBox)
+
+    # Add vertical spacer
+    self.layout.addStretch(1)
+
+  def select_directory_pred(self):
     directory = qt.QFileDialog.getExistingDirectory(self.parent, "Select Directory")
     if directory:
-      self.outputPathBox.setText(directory)
+      self.predPathBox.setText(directory)
+
+  def select_directory_gt(self):
+    directory = qt.QFileDialog.getExistingDirectory(self.parent, "Select Directory")
+    if directory:
+      self.gtPathBox.setText(directory)
+
+  def onStepTimer(self):
+    if self.stepTimerButton.isChecked():
+      self.stepTimer.start(int(1000/int(self.stepFPSBox.value)))
+      self.stepFPSBox.enabled = False
+    else:
+      self.stepTimer.stop()
+      self.stepFPSBox.enabled = True
 
   def onResetStepCount(self):
     self.stepCount = 0
+    self.stepLabel.setText('0')
+  
+  def onLoadPred(self):
+    self.translations_pred = np.load(f'{self.predPathBox.text}/translation_prediction.npz')
+    self.axis_angle_pred = np.load(f'{self.predPathBox.text}/axis_angle_prediction.npz')
 
   def onStepImage(self):
     import re
-    self.stepCount += 1
+    import json
+    self.stepCount = self.stepCount + 1
     stepCountString = str(self.stepCount)
     self.stepLabel.setText(stepCountString)
     
-    prefix = "frame_data"
-    imageFilename = ""
-    frameDataFilename = ""
-    for filename in os.listdir(self.outputPathBox.text):
-      if filename.lstrip('0').split('.')[0] == stepCountString:
-        imageFilename = filename
-      
-      if filename.startswith(prefix):
-        stripped_filename = re.sub('^' + prefix, '', filename).lstrip('0').split('.')[0]
-        if stripped_filename == stepCountString:
-          frameDataFilename = filename
+    if self.gtCheckBox.isChecked():
+      prefix = "frame_data"
+      # imageFilename = ""
+      frameDataFilename = ""
+      for filename in os.listdir(self.gtPathBox.text):
+        # if filename.lstrip('0').split('.')[0] == stepCountString:
+        #   imageFilename = filename
         
-    # Display image
-    image = Image.open(f'{self.outputPathBox.text}/{imageFilename}')
-    image_array = np.array(image)
+        if filename.startswith(prefix):
+          stripped_filename = re.sub('^' + prefix, '', filename).lstrip('0').split('.')[0]
+          if stripped_filename == stepCountString:
+            frameDataFilename = filename
+          
+      # # Display image by moving slice offset
+      #self.inputImageSelector.currentNode()
+      layoutManager = slicer.app.layoutManager()
+      red = layoutManager.sliceWidget('Red')
+      redLogic = red.sliceLogic()
+      redLogic.SetSliceOffset(self.stepCount - 1)
 
-    vtk_image_data = vtk.vtkImageData()
-    vtk_image_data.SetDimensions(image_array.shape[1], image_array.shape[0], 1)
-    vtk_image_data.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
+      # Grab pose data and use it
+      f = open(f'{self.gtPathBox.text}/{frameDataFilename}')
+      data = json.load(f)
+      cameraPose = data['camera-pose']
+      
+      matrix = vtk.vtkMatrix4x4()
+      matrix.SetElement(0, 0, cameraPose[0][0]); matrix.SetElement(0, 1, cameraPose[0][1]); matrix.SetElement(0, 2, cameraPose[0][2]); matrix.SetElement(0, 3, cameraPose[0][3])
+      matrix.SetElement(1, 0, cameraPose[1][0]); matrix.SetElement(1, 1, cameraPose[1][1]); matrix.SetElement(1, 2, cameraPose[1][2]); matrix.SetElement(1, 3, cameraPose[1][3])
+      matrix.SetElement(2, 0, cameraPose[2][0]); matrix.SetElement(2, 1, cameraPose[2][1]); matrix.SetElement(2, 2, cameraPose[2][2]); matrix.SetElement(2, 3, cameraPose[2][3])
+      matrix.SetElement(3, 0, cameraPose[3][0]); matrix.SetElement(3, 1, cameraPose[3][1]); matrix.SetElement(3, 2, cameraPose[3][2]); matrix.SetElement(3, 3, cameraPose[3][3])
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(matrix)
+    else:
+      # Display image by moving slice offset
+      layoutManager = slicer.app.layoutManager()
+      red = layoutManager.sliceWidget('Red')
+      redLogic = red.sliceLogic()
+      redLogic.SetSliceOffset(self.stepCount - 1)
 
-    # Convert the numpy array to a VTK array and set it as the scalars for the vtkImageData object
-    vtk_array = numpy_support.numpy_to_vtk(num_array=image_array.ravel(), deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
-    vtk_image_data.GetPointData().SetScalars(vtk_array)
+      newMatrix = self.axis_angle_to_matrix_with_translation(self.axis_angle_pred['arr_0'][self.stepCount-1][0][0], 0, self.translations_pred['arr_0'][self.stepCount-1][0][0])
+      oldMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(oldMatrix)
+      resultMatrix = vtk.vtkMatrix4x4()
+      vtk.vtkMatrix4x4.Multiply4x4(oldMatrix, newMatrix, resultMatrix)
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
 
-    # Set the vtkImageData object as the image data for the volume node
-    self.inputImageSelector.currentNode().SetAndObserveImageData(vtk_image_data)
-    
-    
+  def axis_angle_to_matrix_with_translation(self, a, theta, t):
+    # Ensure the axis is a unit vector
+    a = a / np.linalg.norm(a)
+
+    a1, a2, a3 = a
+    c = np.cos(theta)
+    s = np.sin(theta)
+    t1, t2, t3 = t
+    one_c = 1 - c
+
+    m00 = c + a1*a1*one_c
+    m11 = c + a2*a2*one_c
+    m22 = c + a3*a3*one_c
+
+    tmp1 = a1*a2*one_c
+    tmp2 = a3*s
+    m10 = tmp1 + tmp2
+    m01 = tmp1 - tmp2
+
+    tmp1 = a1*a3*one_c
+    tmp2 = a2*s
+    m20 = tmp1 - tmp2
+    m02 = tmp1 + tmp2
+
+    tmp1 = a2*a3*one_c
+    tmp2 = a1*s
+    m21 = tmp1 + tmp2
+    m12 = tmp1 - tmp2
+
+    matrix = vtk.vtkMatrix4x4()
+    matrix.SetElement(0, 0, m00); matrix.SetElement(0, 1, m01); matrix.SetElement(0, 2, m02); matrix.SetElement(0, 3, t1)
+    matrix.SetElement(1, 0, m10); matrix.SetElement(1, 1, m11); matrix.SetElement(1, 2, m12); matrix.SetElement(0, 3, t2)
+    matrix.SetElement(2, 0, m20); matrix.SetElement(2, 1, m21); matrix.SetElement(2, 2, m22); matrix.SetElement(0, 3, t3)
+    matrix.SetElement(3, 0, 0); matrix.SetElement(3, 1, 0); matrix.SetElement(3, 2, 0); matrix.SetElement(0, 3, 1)
+
+    return matrix
