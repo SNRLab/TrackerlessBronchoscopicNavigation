@@ -6,8 +6,11 @@ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from vtk.util import numpy_support
 import numpy as np
+import torch
+import math
 from sys import platform
 from PIL import Image
+from Resources import layers
 
 class TrackerlessBronchoscopicNavigation(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
@@ -88,7 +91,7 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.stepModeCollapsibleButton)
     stepModeLayout = qt.QFormLayout(self.stepModeCollapsibleButton)
 
-    self.predPathBox = qt.QLineEdit("D:/MeghaData/predictions")
+    self.predPathBox = qt.QLineEdit("D:/MeghaData/data/dataset_14")
     self.predPathBox.setReadOnly(True)
     self.predPathButton = qt.QPushButton("...")
     self.predPathButton.clicked.connect(self.select_directory_pred)
@@ -105,7 +108,7 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
     self.gtCheckBox.setChecked(False)
     stepModeLayout.addWidget(self.gtCheckBox)
 
-    self.gtPathBox = qt.QLineEdit("D:/MeghaData/predictions/dataset_14/keyframe_1")
+    self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/dataset_14/keyframe_1")
     self.gtPathBox.setReadOnly(True)
     self.gtPathButton = qt.QPushButton("...")
     self.gtPathButton.clicked.connect(self.select_directory_gt)
@@ -135,8 +138,16 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
     self.stepFPSBox.setMaximum(144)
     self.stepFPSBox.setMinimum(1)
     self.stepFPSBox.setSuffix(" FPS")
-    self.stepFPSBox.value = 10
+    self.stepFPSBox.value = 60
     stepModeLayout.addWidget(self.stepFPSBox)
+
+    self.scaleSliderWidget = ctk.ctkSliderWidget()
+    self.scaleSliderWidget.setDecimals(2)
+    self.scaleSliderWidget.minimum = 0.00
+    self.scaleSliderWidget.maximum = 10000.00
+    self.scaleSliderWidget.singleStep = 0.01
+    self.scaleSliderWidget.value = 200.00
+    stepModeLayout.addRow("Scale Factor:", self.scaleSliderWidget)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -162,10 +173,24 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
   def onResetStepCount(self):
     self.stepCount = 0
     self.stepLabel.setText('0')
+
+    layoutManager = slicer.app.layoutManager()
+    red = layoutManager.sliceWidget('Red')
+    redLogic = red.sliceLogic()
+    redLogic.SetSliceOffset(0)
+
+    green = layoutManager.sliceWidget('Green')
+    greenLogic = green.sliceLogic()
+    greenLogic.SetSliceOffset(0)
+    
+    resultMatrix = vtk.vtkMatrix4x4()
+    self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
   
   def onLoadPred(self):
-    self.translations_pred = np.load(f'{self.predPathBox.text}/translation_prediction.npz')
-    self.axis_angle_pred = np.load(f'{self.predPathBox.text}/axis_angle_prediction.npz')
+    self.translations_pred = np.load(f'{self.predPathBox.text}/translation.npz')
+    self.axis_angle_pred = np.load(f'{self.predPathBox.text}/axisangle.npz')
+    self.pose_pred = np.load(f'{self.predPathBox.text}/pose_prediction.npz')
+
 
   def onStepImage(self):
     import re
@@ -194,6 +219,10 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
       redLogic = red.sliceLogic()
       redLogic.SetSliceOffset(self.stepCount - 1)
 
+      green = layoutManager.sliceWidget('Green')
+      greenLogic = green.sliceLogic()
+      greenLogic.SetSliceOffset(self.stepCount - 1)
+
       # Grab pose data and use it
       f = open(f'{self.gtPathBox.text}/{frameDataFilename}')
       data = json.load(f)
@@ -212,46 +241,101 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
       redLogic = red.sliceLogic()
       redLogic.SetSliceOffset(self.stepCount - 1)
 
-      newMatrix = self.axis_angle_to_matrix_with_translation(self.axis_angle_pred['arr_0'][self.stepCount-1][0][0], 0, self.translations_pred['arr_0'][self.stepCount-1][0][0])
-      oldMatrix = vtk.vtkMatrix4x4()
-      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(oldMatrix)
-      resultMatrix = vtk.vtkMatrix4x4()
-      vtk.vtkMatrix4x4.Multiply4x4(oldMatrix, newMatrix, resultMatrix)
-      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
+      green = layoutManager.sliceWidget('Green')
+      greenLogic = green.sliceLogic()
+      greenLogic.SetSliceOffset(self.stepCount - 1)
 
-  def axis_angle_to_matrix_with_translation(self, a, theta, t):
-    # Ensure the axis is a unit vector
-    a = a / np.linalg.norm(a)
+      scale = self.scaleSliderWidget.value
 
-    a1, a2, a3 = a
-    c = np.cos(theta)
-    s = np.sin(theta)
-    t1, t2, t3 = t
-    one_c = 1 - c
+      previousMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
-    m00 = c + a1*a1*one_c
-    m11 = c + a2*a2*one_c
-    m22 = c + a3*a3*one_c
+      previousRotationMatrix = vtk.vtkMatrix4x4()
+      for i in range(3):
+        for j in range(3):
+          previousRotationMatrix.SetElement(i, j, previousMatrix.GetElement(i, j))
 
-    tmp1 = a1*a2*one_c
-    tmp2 = a3*s
-    m10 = tmp1 + tmp2
-    m01 = tmp1 - tmp2
+      # Just use the o
+      pred_poses = []
+      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      pred_poses = np.concatenate(pred_poses)
+      dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
 
-    tmp1 = a1*a3*one_c
-    tmp2 = a2*s
-    m20 = tmp1 - tmp2
-    m02 = tmp1 + tmp2
+      #print(dump_our[1])
 
-    tmp1 = a2*a3*one_c
-    tmp2 = a1*s
-    m21 = tmp1 + tmp2
-    m12 = tmp1 - tmp2
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))
 
-    matrix = vtk.vtkMatrix4x4()
-    matrix.SetElement(0, 0, m00); matrix.SetElement(0, 1, m01); matrix.SetElement(0, 2, m02); matrix.SetElement(0, 3, t1)
-    matrix.SetElement(1, 0, m10); matrix.SetElement(1, 1, m11); matrix.SetElement(1, 2, m12); matrix.SetElement(0, 3, t2)
-    matrix.SetElement(2, 0, m20); matrix.SetElement(2, 1, m21); matrix.SetElement(2, 2, m22); matrix.SetElement(0, 3, t3)
-    matrix.SetElement(3, 0, 0); matrix.SetElement(3, 1, 0); matrix.SetElement(3, 2, 0); matrix.SetElement(0, 3, 1)
+  def vtk_to_numpy_matrix(self, vtk_matrix):
+    numpy_matrix = np.zeros((4, 4))
+    for i in range(4):
+      for j in range(4):
+        numpy_matrix[i, j] = vtk_matrix.GetElement(i, j)
+    return numpy_matrix
+  
+  def numpy_to_vtk_matrix(self, numpy_matrix):
+    # Ensure the numpy matrix is 4x4
+    assert numpy_matrix.shape == (4, 4), "The input numpy matrix must be 4x4"
 
-    return matrix
+    # Create an empty vtkMatrix4x4
+    vtk_matrix = vtk.vtkMatrix4x4()
+
+    # Fill the vtkMatrix4x4 with values from the numpy matrix
+    for i in range(4):
+      for j in range(4):
+        vtk_matrix.SetElement(i, j, numpy_matrix[i, j])
+
+    return vtk_matrix
+
+  def dump(self, cam_to_world, source_to_target_transformations):
+    Ms = []
+    #cam_to_world = np.eye(4)
+    Ms.append(cam_to_world)
+    for source_to_target_transformation in source_to_target_transformations:
+        cam_to_world = np.dot(source_to_target_transformation, cam_to_world)
+        Ms.append(cam_to_world)
+    return Ms
+
+  def MatrixFromRotation(self, angle, x, y, z, matrix):
+
+    matrix.Identity()
+
+    if (angle == 0.0 or (x == 0.0 and y == 0.0 and z == 0.0)):
+      return
+
+    # convert to radians
+    angle = vtk.vtkMath.RadiansFromDegrees(angle)
+
+    # make a normalized quaternion
+    w = math.cos(0.5 * angle)
+    f = math.sin(0.5 * angle) / math.sqrt(x * x + y * y + z * z)
+    x = x * f
+    y = y * f
+    z = z * f
+
+    # convert the quaternion to a matrix
+    ww = w * w
+    wx = w * x
+    wy = w * y
+    wz = w * z
+
+    xx = x * x
+    yy = y * y
+    zz = z * z
+
+    xy = x * y
+    xz = x * z
+    yz = y * z
+
+    s = ww - xx - yy - zz
+
+    matrix.SetElement(0,0, xx * 2 + s)
+    matrix.SetElement(1,0, (xy + wz) * 2)
+    matrix.SetElement(2,0, (xz - wy) * 2)
+
+    matrix.SetElement(0,1, (xy - wz) * 2)
+    matrix.SetElement(1,1, yy * 2 + s)
+    matrix.SetElement(2,1, (yz + wx) * 2)
+
+    matrix.SetElement(0,2, (xz + wy) * 2)
+    matrix.SetElement(1,2, (yz - wx) * 2)
+    matrix.SetElement(2,2, zz * 2 + s)
