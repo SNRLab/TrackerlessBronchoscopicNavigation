@@ -2,6 +2,7 @@
 from __main__ import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import math
+from PIL import Image, ImageDraw
 
 import os
 import math
@@ -137,6 +138,15 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
     self.transformSelector5.setMRMLScene( slicer.mrmlScene )
     controlLayout.addRow("Target 4 Transform 5DoF:", self.transformSelector5)
 
+    self.inputsFiducialSelector = slicer.qMRMLNodeComboBox()
+    self.inputsFiducialSelector.nodeTypes = ["vtkMRMLMarkupsFiducialNode"]
+    self.inputsFiducialSelector.selectNodeUponCreation = False
+    self.inputsFiducialSelector.noneEnabled = True
+    self.inputsFiducialSelector.addEnabled = False
+    self.inputsFiducialSelector.showHidden = False
+    self.inputsFiducialSelector.setMRMLScene( slicer.mrmlScene )
+    controlLayout.addRow("Inputs:", self.inputsFiducialSelector)   
+
     self.imagePathBox = qt.QLineEdit()
     self.imageBrowseButton = qt.QPushButton("...")
     self.imageBrowseButton.clicked.connect(self.select_directory)
@@ -162,13 +172,33 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
 
   def stop(self):
     self.recordTimer.stop()
+
+  def generateInputsImage(self):
+    inputsFiducial = self.inputsFiducialSelector.currentNode()
+    inputs = [0,0,0]
+    inputsFiducial.GetNthFiducialPosition(0, inputs)
     
+    image_size = (200, 200)
+    center = (image_size[0]//2, image_size[1]//2)
+    image = Image.new('L', image_size, 'gray')
+    draw = ImageDraw.Draw(image)
+
+    circle_diameter = 40
+    circle_brightness = int((inputs[2] + 1) * 127.5)
+    circle_coords = [(image_size[0]/2 - circle_diameter/2, image_size[1]/2 - circle_diameter/2), (image_size[0]/2 + circle_diameter/2, image_size[1]/2 + circle_diameter/2)]
+    draw.ellipse(circle_coords, fill=circle_brightness)
+
+    draw.line([center, (inputs[0]*image_size[0]+(image_size[0]//2),inputs[1]*image_size[1]+(image_size[1]//2))], fill='white', width = 8)
+    
+    return image
+
   def record(self):
     if self.imagePathBox.text:
       timestamp_millis = int(time.time() * 1000)
       filename = fr'{self.imagePathBox.text}/rgb_{timestamp_millis}'
       grayFilename = fr'{self.imagePathBox.text}/gray_{timestamp_millis}'
       depthFilename = fr'{self.imagePathBox.text}/depth_{timestamp_millis}'
+      inputsFilename = fr'{self.imagePathBox.text}/input_{timestamp_millis}'
       rgbImageData = None
       grayscaleImageData = None
       depthImageData = None
@@ -190,6 +220,10 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
         depthWriter.SetInputData(depthImageData)
         depthWriter.SetFileName(f'{depthFilename}.png')
         depthWriter.Write()
+      if self.inputsFiducialSelector.currentNode():
+        inputsImageData = self.generateInputsImage()
+        inputsImageData.save(f'{inputsFilename}.png')
+
       
       if self.transformSelector.currentNode():
         with open(f'{self.imagePathBox.text}/log.txt', 'a+') as file:
