@@ -60,7 +60,7 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
     self.FPSBox.setMaximum(144)
     self.FPSBox.setMinimum(1)
     self.FPSBox.setSuffix(" FPS")
-    self.FPSBox.value = 10
+    self.FPSBox.value = 20
     controlLayout.addRow("Target Rate:", self.FPSBox)
     
     self.recordTimer = qt.QTimer()
@@ -178,19 +178,37 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
     inputs = [0,0,0]
     inputsFiducial.GetNthFiducialPosition(0, inputs)
     
+    # image_size = (200, 200)
+    # center = (image_size[0]//2, image_size[1]//2)
+    # image = Image.new('L', image_size, 'gray')
+    # draw = ImageDraw.Draw(image)
+
+    # circle_diameter = 40
+    # circle_brightness = int((inputs[2] + 1) * 127.5)
+    # circle_coords = [(image_size[0]/2 - circle_diameter/2, image_size[1]/2 - circle_diameter/2), (image_size[0]/2 + circle_diameter/2, image_size[1]/2 + circle_diameter/2)]
+    # draw.ellipse(circle_coords, fill=circle_brightness)
+
+    # draw.line([center, (inputs[0]*image_size[0]+(image_size[0]//2),inputs[1]*image_size[1]+(image_size[1]//2))], fill='white', width = 8)
+    
+    #return image
+
     image_size = (200, 200)
     center = (image_size[0]//2, image_size[1]//2)
-    image = Image.new('L', image_size, 'gray')
-    draw = ImageDraw.Draw(image)
 
-    circle_diameter = 40
+    linear_image = Image.new('L', image_size, 'gray')
+    linear_draw = ImageDraw.Draw(linear_image)
+
+    circle_diameter = 900
     circle_brightness = int((inputs[2] + 1) * 127.5)
     circle_coords = [(image_size[0]/2 - circle_diameter/2, image_size[1]/2 - circle_diameter/2), (image_size[0]/2 + circle_diameter/2, image_size[1]/2 + circle_diameter/2)]
-    draw.ellipse(circle_coords, fill=circle_brightness)
+    linear_draw.ellipse(circle_coords, fill=circle_brightness)
 
-    draw.line([center, (inputs[0]*image_size[0]+(image_size[0]//2),inputs[1]*image_size[1]+(image_size[1]//2))], fill='white', width = 8)
-    
-    return image
+    direction_image = Image.new('L', image_size, 'black')
+    direction_draw = ImageDraw.Draw(direction_image)
+
+    direction_draw.line([center, (inputs[0]*image_size[0]+(image_size[0]//2),inputs[1]*image_size[1]+(image_size[1]//2))], fill='white', width = 12)
+
+    return direction_image, linear_image
 
   def record(self):
     if self.imagePathBox.text:
@@ -198,7 +216,9 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
       filename = fr'{self.imagePathBox.text}/rgb_{timestamp_millis}'
       grayFilename = fr'{self.imagePathBox.text}/gray_{timestamp_millis}'
       depthFilename = fr'{self.imagePathBox.text}/depth_{timestamp_millis}'
-      inputsFilename = fr'{self.imagePathBox.text}/input_{timestamp_millis}'
+      #inputsFilename = fr'{self.imagePathBox.text}/input_{timestamp_millis}'
+      inputsDirectionFilename = fr'{self.imagePathBox.text}/inputDirection_{timestamp_millis}'
+      inputsLinearFilename = fr'{self.imagePathBox.text}/inputLinear_{timestamp_millis}'
       rgbImageData = None
       grayscaleImageData = None
       depthImageData = None
@@ -221,9 +241,11 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
         depthWriter.SetFileName(f'{depthFilename}.png')
         depthWriter.Write()
       if self.inputsFiducialSelector.currentNode():
-        inputsImageData = self.generateInputsImage()
-        inputsImageData.save(f'{inputsFilename}.png')
-
+        # inputsImageData = self.generateInputsImage()
+        # inputsImageData.save(f'{inputsFilename}.png')
+        inputsDirectionImageData, inputsLinearImageData = self.generateInputsImage()
+        inputsDirectionImageData.save(f'{inputsDirectionFilename}.png')
+        inputsLinearImageData.save(f'{inputsLinearFilename}.png')
       
       if self.transformSelector.currentNode():
         with open(f'{self.imagePathBox.text}/log.txt', 'a+') as file:
