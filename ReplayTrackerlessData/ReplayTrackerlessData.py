@@ -14,14 +14,14 @@ from Resources import layers
 import re
 import json
 
-class TrackerlessBronchoscopicNavigation(ScriptedLoadableModule):
+class ReplayTrackerlessData(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Bakse/Python/slicer/ScriptedLoadableModule.py
   """
 
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
-    self.parent.title = "Trackerless Bronchoscopic Navigation"
+    self.parent.title = "Replay Trackerless Data"
     self.parent.categories = ["Navigation"]
     self.parent.dependencies = []
     self.parent.contributors = ["Franklin King, Megha Kalia"]
@@ -38,7 +38,7 @@ class TrackerlessBronchoscopicNavigation(ScriptedLoadableModule):
         parent.icon = qt.QIcon(iconPath)
         break
 
-class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
+class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
   """Uses ScriptedLoadableModuleWidget base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
@@ -54,7 +54,7 @@ class TrackerlessBronchoscopicNavigationWidget(ScriptedLoadableModuleWidget):
     self.stepTimer.stop()
     self.onResetStepCount()
 
-  def onReload(self,moduleName="TrackerlessBronchoscopicNavigation"):
+  def onReload(self,moduleName="ReplayTrackerlessData"):
     self.stepTimer.stop()
     self.onResetStepCount()
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)    
