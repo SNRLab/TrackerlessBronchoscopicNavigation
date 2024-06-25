@@ -113,7 +113,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.stepModeCollapsibleButton)
     stepModeLayout = qt.QFormLayout(self.stepModeCollapsibleButton)
 
-    self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/dataset_14/keyframe_1")
+    self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/upsample_4gauss_mask_0.0001/data")
     self.gtPathBox.setReadOnly(True)
     self.gtPathButton = qt.QPushButton("...")
     self.gtPathButton.clicked.connect(self.select_directory_gt)
@@ -122,13 +122,21 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     gtPathBoxLayout.addWidget(self.gtPathButton)
     stepModeLayout.addRow("Data: ", gtPathBoxLayout)
 
-    self.gtCheckBox = qt.QCheckBox("Use Ground Truth Data")
-    self.gtCheckBox.setChecked(False)
-    stepModeLayout.addRow(self.gtCheckBox)
+    self.methodSelectionComboBox = qt.QComboBox()
+    self.methodSelectionComboBox.addItem('ICP')
+    self.methodSelectionComboBox.addItem('ICP with Pose')
+    self.methodSelectionComboBox.addItem('Ground Truth')
+    self.methodSelectionComboBox.addItem('None')
+    self.methodSelectionComboBox.setCurrentIndex(0)
+    stepModeLayout.addRow('Registration Method:', self.methodSelectionComboBox)
 
-    self.icpCheckBox = qt.QCheckBox("Use ICP")
-    self.icpCheckBox.setChecked(False)
-    stepModeLayout.addRow(self.icpCheckBox)
+    # self.gtCheckBox = qt.QCheckBox("Use Ground Truth Data")
+    # self.gtCheckBox.setChecked(False)
+    # stepModeLayout.addRow(self.gtCheckBox)
+
+    # self.icpCheckBox = qt.QCheckBox("Use ICP")
+    # self.icpCheckBox.setChecked(False)
+    # stepModeLayout.addRow(self.icpCheckBox)
 
     self.loadPredButton = qt.QPushButton("Load Predictions")
     stepModeLayout.addRow(self.loadPredButton)
@@ -162,7 +170,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepFPSBox.setMaximum(144)
     self.stepFPSBox.setMinimum(1)
     self.stepFPSBox.setSuffix(" FPS")
-    self.stepFPSBox.value = 60
+    self.stepFPSBox.value = 10
     stepModeLayout.addRow(self.stepFPSBox)
 
     self.scaleSliderWidget = ctk.ctkSliderWidget()
@@ -199,12 +207,31 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.pointCloudSelector.setMRMLScene(slicer.mrmlScene)
     depthMapModeLayout.addRow("Point Cloud Model: ", self.pointCloudSelector)
 
+    self.centerlineSelector = slicer.qMRMLNodeComboBox()
+    self.centerlineSelector.nodeTypes = ( ("vtkMRMLModelNode"), "" )
+    self.centerlineSelector.selectNodeUponCreation = True
+    self.centerlineSelector.addEnabled = True
+    self.centerlineSelector.removeEnabled = True
+    self.centerlineSelector.renameEnabled = True
+    self.centerlineSelector.noneEnabled = False
+    self.centerlineSelector.showHidden = False
+    self.centerlineSelector.showChildNodeTypes = False
+    self.centerlineSelector.setMRMLScene(slicer.mrmlScene)
+    depthMapModeLayout.addRow("Center Line Model: ", self.centerlineSelector)
+
+    self.maskSelectionComboBox = qt.QComboBox()
+    self.maskSelectionComboBox.addItems(['Mask Image', 'Crop'])
+    self.maskSelectionComboBox.setCurrentIndex(0)
+    self.maskSelectionComboBox.currentIndexChanged.connect(self.onMaskSelection)
+    depthMapModeLayout.addRow('Mask method:', self.maskSelectionComboBox)
+
     self.cornerCutBox = qt.QSpinBox()
     self.cornerCutBox.setSingleStep(1)
     self.cornerCutBox.setMaximum(100)
     self.cornerCutBox.setMinimum(0)
     self.cornerCutBox.setSuffix(" px")
     self.cornerCutBox.value = 40
+    self.cornerCutBox.setEnabled(False)
     depthMapModeLayout.addRow("Corner size to cut:", self.cornerCutBox)
 
     self.borderCutBox = qt.QSpinBox()
@@ -213,6 +240,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.borderCutBox.setMinimum(0)
     self.borderCutBox.setSuffix(" px")
     self.borderCutBox.value = 40
+    self.borderCutBox.setEnabled(False)
     depthMapModeLayout.addRow("Border size to cut:", self.borderCutBox)    
 
     self.focalLengthBox = ctk.ctkDoubleSpinBox()
@@ -275,14 +303,71 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     if self.inputTransformSelector.currentNode():
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
   
+  def onMaskSelection(self, index):
+    if index == 1:
+      self.cornerCutBox.setEnabled(True)
+      self.borderCutBox.setEnabled(True)
+    else:
+      self.cornerCutBox.setEnabled(False)
+      self.borderCutBox.setEnabled(False)
+
   def onLoadPred(self):
     self.translations_pred = np.load(f'{self.gtPathBox.text}/translation.npz')
     self.axis_angle_pred = np.load(f'{self.gtPathBox.text}/axisangle.npz')
     self.pose_pred = np.load(f'{self.gtPathBox.text}/pose_prediction.npz')
 
+  def createPointCloud(self, stepCountString, maskImage):
+    suffix = "_depth.npy"
+    depthMapFilename = ""
+    for filename in os.listdir(self.gtPathBox.text):
+      if filename.endswith(suffix):
+        stripped_filename = re.sub(suffix + '$', '', filename).lstrip('0').split('.')[0]
+        if stripped_filename == stepCountString:
+          depthMapFilename = filename
+    depthMap = np.load(f'{self.gtPathBox.text}/{depthMapFilename}')[0][0]
+
+    if self.maskSelectionComboBox.currentIndex == 1:
+      prefix = "mask_"
+      suffix = ".jpeg"
+      maskFilename = ""
+      for filename in os.listdir(self.gtPathBox.text):
+        if filename.startswith(prefix) and filename.endswith(suffix):
+          base_name = filename.split(".")[0]
+          number_str = base_name.split("_")[1]
+          if number_str == stepCountString:
+            maskFilename = filename
+      maskImage = np.load(f'{self.gtPathBox.text}/{maskFilename}')[0][0]
+    if self.imageSelector.currentNode():
+      self.depthMapToPointCloud(depthMap, slicer.util.arrayFromVolume(self.imageSelector.currentNode())[self.stepCount], maskImage)
+    else:
+      self.depthMapToPointCloud(depthMap, None, maskImage)
+
+  def adjustSliceOffset(self):
+    layoutManager = slicer.app.layoutManager()
+
+    # Depth Map
+    red = layoutManager.sliceWidget('Red')
+    redLogic = red.sliceLogic()
+    redLogic.SetSliceOffset(self.stepCount//self.stepSkipBox.value - 1)
+
+    # RGB
+    green = layoutManager.sliceWidget('Green')
+    greenLogic = green.sliceLogic()
+    greenLogic.SetSliceOffset(self.stepCount - 1)
+
   def onStepImage(self):
     stepCountString = str(self.stepCount)
-    if self.gtCheckBox.isChecked():
+    maskImage = None
+    # ------------------------------ Ground Truth ------------------------------
+    if self.methodComboBox.currentText == "Ground Truth":
+      if self.pointCloudSelector.currentNode():
+        self.createPointCloud(stepCountString, maskImage)
+          
+      # Display image by moving slice offset
+      self.adjustSliceOffset()
+
+      # Start Load Ground Truth:
+
       prefix = "frame_data"
       frameDataFilename = ""
       for filename in os.listdir(self.gtPathBox.text):
@@ -290,30 +375,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
           stripped_filename = re.sub('^' + prefix, '', filename).lstrip('0').split('.')[0]
           if stripped_filename == stepCountString:
             frameDataFilename = filename
-
-      if self.pointCloudSelector.currentNode():
-        suffix = "_depth.npy"
-        depthMapFilename = ""
-        for filename in os.listdir(self.gtPathBox.text):
-          if filename.endswith(suffix):
-            stripped_filename = re.sub(suffix + '$', '', filename).lstrip('0').split('.')[0]
-            if stripped_filename == stepCountString:
-              depthMapFilename = filename
-        depthMap = np.load(f'{self.gtPathBox.text}/{depthMapFilename}')[0][0]
-        if self.imageSelector.currentNode():
-          self.depthMapToPointCloud(depthMap, slicer.util.arrayFromVolume(self.imageSelector.currentNode())[self.stepCount])
-        else:
-          self.depthMapToPointCloud(depthMap, None)
-          
-      # Display image by moving slice offset
-      layoutManager = slicer.app.layoutManager()
-      red = layoutManager.sliceWidget('Red')
-      redLogic = red.sliceLogic()
-      redLogic.SetSliceOffset(self.stepCount - 1)
-
-      green = layoutManager.sliceWidget('Green')
-      greenLogic = green.sliceLogic()
-      greenLogic.SetSliceOffset(self.stepCount - 1)
 
       # Grab pose data and use it
       f = open(f'{self.gtPathBox.text}/{frameDataFilename}')
@@ -326,50 +387,57 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       matrix.SetElement(2, 0, cameraPose[2][0]); matrix.SetElement(2, 1, cameraPose[2][1]); matrix.SetElement(2, 2, cameraPose[2][2]); matrix.SetElement(2, 3, cameraPose[2][3])
       matrix.SetElement(3, 0, cameraPose[3][0]); matrix.SetElement(3, 1, cameraPose[3][1]); matrix.SetElement(3, 2, cameraPose[3][2]); matrix.SetElement(3, 3, cameraPose[3][3])
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(matrix)
-    else:
+    # ------------------------------ None ------------------------------
+    elif self.methodComboBox.currentText == "None":
       if self.pointCloudSelector.currentNode():
-        suffix = "_depth.npy"
-        depthMapFilename = ""
-        for filename in os.listdir(self.gtPathBox.text):
-          if filename.endswith(suffix):
-            stripped_filename = re.sub(suffix + '$', '', filename).lstrip('0').split('.')[0]
-            if stripped_filename == stepCountString:
-              depthMapFilename = filename
-        depthMap = np.load(f'{self.gtPathBox.text}/{depthMapFilename}')[0][0]
-        if self.imageSelector.currentNode():
-          self.depthMapToPointCloud(depthMap, slicer.util.arrayFromVolume(self.imageSelector.currentNode())[self.stepCount])
-        else:
-          self.depthMapToPointCloud(depthMap, None)
-
+        self.createPointCloud(stepCountString, maskImage)
+          
       # Display image by moving slice offset
-      layoutManager = slicer.app.layoutManager()
-      red = layoutManager.sliceWidget('Red')
-      redLogic = red.sliceLogic()
-      redLogic.SetSliceOffset(self.stepCount - 1)
+      self.adjustSliceOffset()
+    # ------------------------------ ICP ------------------------------
+    elif self.methodComboBox.currentText == "ICP":
+      if self.pointCloudSelector.currentNode():
+        self.createPointCloud(stepCountString, maskImage)
+          
+      # Display image by moving slice offset
+      self.adjustSliceOffset()
 
-      green = layoutManager.sliceWidget('Green')
-      greenLogic = green.sliceLogic()
-      greenLogic.SetSliceOffset(self.stepCount - 1)
+      # Start ICP:
+    # ------------------------------ ICP with Pose ------------------------------
+    elif self.methodComboBox.currentText == "ICP with Pose":
+      pass
+      # if self.pointCloudSelector.currentNode():
+      #   self.createPointCloud(stepCountString, maskImage)
+          
+      # # Display image by moving slice offset
+      self.adjustSliceOffset()
 
-      scale = self.scaleSliderWidget.value
+      # Start ICP:
+    # ------------------------------ Model ------------------------------
+    elif self.methodComboBox.currentText == "Model":
+      pass
+      # if self.pointCloudSelector.currentNode():
+      #   self.createPointCloud(stepCountString, maskImage)
 
-      previousMatrix = vtk.vtkMatrix4x4()
-      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
+      # # Display image by moving slice offset
+      # self.adjustSliceOffset()
 
-      previousRotationMatrix = vtk.vtkMatrix4x4()
-      for i in range(3):
-        for j in range(3):
-          previousRotationMatrix.SetElement(i, j, previousMatrix.GetElement(i, j))
+      # scale = self.scaleSliderWidget.value
 
-      pred_poses = []
-      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
-      pred_poses = np.concatenate(pred_poses)
-      dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
+      # previousMatrix = vtk.vtkMatrix4x4()
+      # self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
-      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))
+      # previousRotationMatrix = vtk.vtkMatrix4x4()
+      # for i in range(3):
+      #   for j in range(3):
+      #     previousRotationMatrix.SetElement(i, j, previousMatrix.GetElement(i, j))
 
-      if self.icpCheckBox.isChecked():
-        self.registerToBaseModel()
+      # pred_poses = []
+      # pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      # pred_poses = np.concatenate(pred_poses)
+      # dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
+
+      # self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))
 
     self.stepCount = self.stepCount + self.stepSkipBox.value
     self.stepLabel.setText(stepCountString)
@@ -468,21 +536,25 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # vtk.vtkMatrix4x4.Multiply4x4(transientMatrix, matrix, resultMatrix)
     # self.transformSelector.currentNode().SetMatrixTransformToParent(resultMatrix)
 
-  def depthMapToPointCloud(self, depthImage, rgbImage):
+  def depthMapToPointCloud(self, depthImage, rgbImage, maskImage = None):
     height = len(depthImage)
     width = len(depthImage[0])
 
-    # Cut corners and border
-    cornerSize = self.cornerCutBox.value
-    borderSize = self.borderCutBox.value
-    depthImage[:cornerSize, :cornerSize] = np.nan
-    depthImage[:cornerSize, -cornerSize:] = np.nan
-    depthImage[-cornerSize:, :cornerSize] = np.nan
-    depthImage[-cornerSize:, -cornerSize:] = np.nan
-    depthImage[:borderSize, :] = np.nan
-    depthImage[-borderSize:, :] = np.nan
-    depthImage[:, :borderSize] = np.nan
-    depthImage[:, -borderSize:] = np.nan
+    if maskImage:
+      # Mask
+      depthImage[~maskImage] = np.nan
+    else:
+      # Cut corners and border
+      cornerSize = self.cornerCutBox.value
+      borderSize = self.borderCutBox.value
+      depthImage[:cornerSize, :cornerSize] = np.nan
+      depthImage[:cornerSize, -cornerSize:] = np.nan
+      depthImage[-cornerSize:, :cornerSize] = np.nan
+      depthImage[-cornerSize:, -cornerSize:] = np.nan
+      depthImage[:borderSize, :] = np.nan
+      depthImage[-borderSize:, :] = np.nan
+      depthImage[:, :borderSize] = np.nan
+      depthImage[:, -borderSize:] = np.nan
 
     minimumDepth = np.nanmin(depthImage)
     maximumDepth = np.nanmax(depthImage)
