@@ -48,14 +48,19 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepCount = 1
     self.stepTimer = qt.QTimer()
     self.stepTimer.timeout.connect(self.onStepImage)
-    self.surfaceRegistrationModule = slicer.modules.surfaceregistration.widgetRepresentation().self()
+    self.centerlineScaleFactor = 1.0
+    self.centerlineStartRadius = 1.0
 
   def cleanup(self):
     self.stepTimer.stop()
+    self.centerlineScaleFactor = 1.0
+    self.centerlineStartRadius = 1.0
     self.onResetStepCount()
 
   def onReload(self,moduleName="ReplayTrackerlessData"):
     self.stepTimer.stop()
+    self.centerlineScaleFactor = 1.0
+    self.centerlineStartRadius = 1.0
     self.onResetStepCount()
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)    
 
@@ -85,27 +90,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.inputTransformSelector.setMRMLScene(slicer.mrmlScene)
     IOLayout.addRow("Camera Transform: ", self.inputTransformSelector)
 
-    self.baseModelSelector = slicer.qMRMLNodeComboBox()
-    self.baseModelSelector.nodeTypes = ( ("vtkMRMLModelNode"), "" )
-    self.baseModelSelector.selectNodeUponCreation = False
-    self.baseModelSelector.addEnabled = False
-    self.baseModelSelector.removeEnabled = True
-    self.baseModelSelector.renameEnabled = True
-    self.baseModelSelector.noneEnabled = False
-    self.baseModelSelector.showHidden = False
-    self.baseModelSelector.showChildNodeTypes = False
-    self.baseModelSelector.setMRMLScene(slicer.mrmlScene)
-    IOLayout.addRow("Base Model: ", self.baseModelSelector)
-
-    self.icpTransformSelector = slicer.qMRMLNodeComboBox()
-    self.icpTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
-    self.icpTransformSelector.selectNodeUponCreation = False
-    self.icpTransformSelector.noneEnabled = False
-    self.icpTransformSelector.addEnabled = True
-    self.icpTransformSelector.removeEnabled = True
-    self.icpTransformSelector.setMRMLScene(slicer.mrmlScene)
-    IOLayout.addRow("ICP Transform: ", self.icpTransformSelector)
-
     # Step mode Recorded Data collapsible button
     self.stepModeCollapsibleButton = ctk.ctkCollapsibleButton()
     self.stepModeCollapsibleButton.text = "Step Mode - Recorded Data"
@@ -122,13 +106,15 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     gtPathBoxLayout.addWidget(self.gtPathButton)
     stepModeLayout.addRow("Data: ", gtPathBoxLayout)
 
-    self.methodSelectionComboBox = qt.QComboBox()
-    self.methodSelectionComboBox.addItem('ICP')
-    self.methodSelectionComboBox.addItem('ICP with Pose')
-    self.methodSelectionComboBox.addItem('Ground Truth')
-    self.methodSelectionComboBox.addItem('None')
-    self.methodSelectionComboBox.setCurrentIndex(0)
-    stepModeLayout.addRow('Registration Method:', self.methodSelectionComboBox)
+    self.methodComboBox = qt.QComboBox()
+    self.methodComboBox.addItem('ICP Only')
+    self.methodComboBox.addItem('Recorded AI Pose')
+    self.methodComboBox.addItem('AI Pose Inference')
+    self.methodComboBox.addItem('AI Pose + ICP')
+    self.methodComboBox.addItem('Ground Truth')
+    self.methodComboBox.addItem('None')
+    self.methodComboBox.setCurrentIndex(1)
+    stepModeLayout.addRow('Registration Method:', self.methodComboBox)
 
     # self.gtCheckBox = qt.QCheckBox("Use Ground Truth Data")
     # self.gtCheckBox.setChecked(False)
@@ -138,9 +124,13 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # self.icpCheckBox.setChecked(False)
     # stepModeLayout.addRow(self.icpCheckBox)
 
+    self.autoInputsButton = qt.QPushButton("Auto Set Input")
+    stepModeLayout.addRow(self.autoInputsButton)
+    self.autoInputsButton.connect('clicked()', self.onAutoInputs)    
+
     self.loadPredButton = qt.QPushButton("Load Predictions")
     stepModeLayout.addRow(self.loadPredButton)
-    self.loadPredButton.connect('clicked()', self.onLoadPred)    
+    self.loadPredButton.connect('clicked()', self.onLoadPred)
 
     self.stepButton = qt.QPushButton("Step Image")
     stepModeLayout.addRow(self.stepButton)
@@ -159,6 +149,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
     self.stepLabel = qt.QLabel("1")
     stepModeLayout.addRow("Image: ", self.stepLabel)
+
+    self.centerlineScaleLabel = qt.QLabel("1.0")
+    stepModeLayout.addRow("Centerline Scale: ", self.centerlineScaleLabel)
 
     self.stepTimerButton = qt.QPushButton("Step Timer")
     self.stepTimerButton.setCheckable(True)
@@ -219,6 +212,15 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.centerlineSelector.setMRMLScene(slicer.mrmlScene)
     depthMapModeLayout.addRow("Center Line Model: ", self.centerlineSelector)
 
+    self.cameraAirwayPositionSelector = slicer.qMRMLNodeComboBox()
+    self.cameraAirwayPositionSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+    self.cameraAirwayPositionSelector.selectNodeUponCreation = False
+    self.cameraAirwayPositionSelector.noneEnabled = True
+    self.cameraAirwayPositionSelector.addEnabled = True
+    self.cameraAirwayPositionSelector.removeEnabled = True
+    self.cameraAirwayPositionSelector.setMRMLScene(slicer.mrmlScene)
+    depthMapModeLayout.addRow("Camera Airway Position Transform: ", self.cameraAirwayPositionSelector)
+
     self.maskSelectionComboBox = qt.QComboBox()
     self.maskSelectionComboBox.addItems(['Mask Image', 'Crop'])
     self.maskSelectionComboBox.setCurrentIndex(0)
@@ -251,16 +253,16 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     depthMapModeLayout.addRow("Focal Length:", self.focalLengthBox)
 
     self.imageScaleBox = ctk.ctkDoubleSpinBox()
-    self.imageScaleBox.setValue(1.0)
+    self.imageScaleBox.setValue(17.0)
     self.imageScaleBox.maximum = 100000.0
     self.imageScaleBox.minimum = 0.0
-    depthMapModeLayout.addRow("Image Scale: ", self.imageScaleBox)
+    depthMapModeLayout.addRow("Base Image Scale: ", self.imageScaleBox)
 
     self.depthScaleBox = ctk.ctkDoubleSpinBox()
-    self.depthScaleBox.setValue(1.0)
+    self.depthScaleBox.setValue(17.0)
     self.depthScaleBox.maximum = 100000.0
     self.depthScaleBox.minimum = 0.0
-    depthMapModeLayout.addRow("Depth Scale: ", self.depthScaleBox)
+    depthMapModeLayout.addRow("Base Depth Scale: ", self.depthScaleBox)
 
     self.thresholdBox = qt.QSpinBox()
     self.thresholdBox.setSingleStep(1)
@@ -270,8 +272,73 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.thresholdBox.value = 60
     depthMapModeLayout.addRow("Threshold:", self.thresholdBox)
 
+    # ICP collapsible button
+    self.icpCollapsibleButton = ctk.ctkCollapsibleButton()
+    self.icpCollapsibleButton.text = "ICP Parameters"
+    self.icpCollapsibleButton.collapsed = False
+    self.layout.addWidget(self.icpCollapsibleButton)
+    icpLayout = qt.QFormLayout(self.icpCollapsibleButton)
+
+    self.baseModelSelector = slicer.qMRMLNodeComboBox()
+    self.baseModelSelector.nodeTypes = ( ("vtkMRMLModelNode"), "" )
+    self.baseModelSelector.selectNodeUponCreation = False
+    self.baseModelSelector.addEnabled = False
+    self.baseModelSelector.removeEnabled = True
+    self.baseModelSelector.renameEnabled = True
+    self.baseModelSelector.noneEnabled = False
+    self.baseModelSelector.showHidden = False
+    self.baseModelSelector.showChildNodeTypes = False
+    self.baseModelSelector.setMRMLScene(slicer.mrmlScene)
+    icpLayout.addRow("Base Model: ", self.baseModelSelector)
+
+    self.icpTransformSelector = slicer.qMRMLNodeComboBox()
+    self.icpTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+    self.icpTransformSelector.selectNodeUponCreation = False
+    self.icpTransformSelector.noneEnabled = False
+    self.icpTransformSelector.addEnabled = True
+    self.icpTransformSelector.removeEnabled = True
+    self.icpTransformSelector.setMRMLScene(slicer.mrmlScene)
+    icpLayout.addRow("ICP Transform: ", self.icpTransformSelector)
+
+    self.checkMeanDistanceCheckBox = qt.QCheckBox("Check Mean Distance")
+    self.checkMeanDistanceCheckBox.setChecked(True)
+    icpLayout.addRow(self.checkMeanDistanceCheckBox)
+
+    self.icpIterationsSlider = ctk.ctkSliderWidget()
+    self.icpIterationsSlider.decimals = 0
+    self.icpIterationsSlider.singleStep = 1
+    self.icpIterationsSlider.minimum = 1
+    self.icpIterationsSlider.maximum = 10000
+    self.icpIterationsSlider.value = 2000
+    icpLayout.addRow("Number of Iterations:", self.icpIterationsSlider)
+
+    self.icpLandmarksSlider = ctk.ctkSliderWidget()
+    self.icpLandmarksSlider.decimals = 0
+    self.icpLandmarksSlider.singleStep = 1
+    self.icpLandmarksSlider.minimum = 1
+    self.icpLandmarksSlider.maximum = 2000
+    self.icpLandmarksSlider.value = 200
+    icpLayout.addRow("Number of Landmarks:", self.icpLandmarksSlider)
+
+    self.icpMaxDistanceSlider = ctk.ctkSliderWidget()
+    self.icpMaxDistanceSlider.decimals = 5
+    self.icpMaxDistanceSlider.singleStep = 0.00001
+    self.icpMaxDistanceSlider.minimum = 0.00001
+    self.icpMaxDistanceSlider.maximum = 1.0
+    self.icpMaxDistanceSlider.value = 0.001
+    icpLayout.addRow("Maximum of Distance:", self.icpMaxDistanceSlider)
+
     # Add vertical spacer
     self.layout.addStretch(1)
+
+  def onAutoInputs(self):
+    self.imageSelector.setCurrentNode(slicer.util.getNode('0000000001'))
+    self.inputTransformSelector.setCurrentNode(slicer.util.getNode('Pose'))
+    self.pointCloudSelector.setCurrentNode(slicer.util.getNode('PointCloud'))
+    self.centerlineSelector.setCurrentNode(slicer.util.getNode('CenterlineModel'))
+    self.cameraAirwayPositionSelector.setCurrentNode(slicer.util.getNode('AirwayPosition'))
+    self.baseModelSelector.setCurrentNode(slicer.util.getNode('airway'))
+    self.icpTransformSelector.setCurrentNode(slicer.util.getNode('ICPTransform'))
 
   def select_directory_gt(self):
     directory = qt.QFileDialog.getExistingDirectory(self.parent, "Select Directory")
@@ -290,6 +357,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepCount = 1
     self.stepLabel.setText('1')
 
+    self.centerlineScaleFactor = 1.0
+
     layoutManager = slicer.app.layoutManager()
     red = layoutManager.sliceWidget('Red')
     redLogic = red.sliceLogic()
@@ -302,6 +371,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     resultMatrix = vtk.vtkMatrix4x4()
     if self.inputTransformSelector.currentNode():
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
+    icpMatrix = vtk.vtkMatrix4x4()
+    if self.icpTransformSelector.currentNode():
+      self.icpTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(icpMatrix)
   
   def onMaskSelection(self, index):
     if index == 1:
@@ -358,6 +430,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
   def onStepImage(self):
     stepCountString = str(self.stepCount)
     maskImage = None
+
+    # Calculates scale from centerline for the next step from the current step if there is a centerline
+    if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode():
+      closestRadius = self.calculateClosestCenterlineRadius()
+      if self.stepCount <= 1:
+        self.centerlineStartRadius = closestRadius
+      self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
+      self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
     # ------------------------------ Ground Truth ------------------------------
     if self.methodComboBox.currentText == "Ground Truth":
       if self.pointCloudSelector.currentNode():
@@ -387,34 +467,80 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       matrix.SetElement(2, 0, cameraPose[2][0]); matrix.SetElement(2, 1, cameraPose[2][1]); matrix.SetElement(2, 2, cameraPose[2][2]); matrix.SetElement(2, 3, cameraPose[2][3])
       matrix.SetElement(3, 0, cameraPose[3][0]); matrix.SetElement(3, 1, cameraPose[3][1]); matrix.SetElement(3, 2, cameraPose[3][2]); matrix.SetElement(3, 3, cameraPose[3][3])
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(matrix)
+      
     # ------------------------------ None ------------------------------
     elif self.methodComboBox.currentText == "None":
+      self.centerlineScaleFactor = 1.0
       if self.pointCloudSelector.currentNode():
         self.createPointCloud(stepCountString, maskImage)
           
       # Display image by moving slice offset
       self.adjustSliceOffset()
     # ------------------------------ ICP ------------------------------
-    elif self.methodComboBox.currentText == "ICP":
+    elif self.methodComboBox.currentText == "ICP Only":
       if self.pointCloudSelector.currentNode():
         self.createPointCloud(stepCountString, maskImage)
           
       # Display image by moving slice offset
       self.adjustSliceOffset()
 
+      # Apply past ICP transform to pose transform
+      parentMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(parentMatrix)
+      childMatrix = vtk.vtkMatrix4x4()
+      self.icpTransformSelector.currentNode().GetMatrixTransformToParent(childMatrix)
+      combinedMatrix = vtk.vtkMatrix4x4()
+      combinedMatrix.Multiply4x4(parentMatrix, childMatrix, combinedMatrix)
+      self.inputTransformSelector.currentNode().SetMatrixTransformToParent(combinedMatrix)
+      identityMatrix = vtk.vtkMatrix4x4()
+      self.icpTransformSelector.currentNode().SetMatrixTransformToParent(identityMatrix)
+      
       # Start ICP:
+      self.calculateAndSetICPTransform()
     # ------------------------------ ICP with Pose ------------------------------
-    elif self.methodComboBox.currentText == "ICP with Pose":
-      pass
-      # if self.pointCloudSelector.currentNode():
-      #   self.createPointCloud(stepCountString, maskImage)
+    elif self.methodComboBox.currentText == "Recorded AI Pose":
+      if self.pointCloudSelector.currentNode():
+        self.createPointCloud(stepCountString, maskImage)
           
-      # # Display image by moving slice offset
+      # Display image by moving slice offset
       self.adjustSliceOffset()
 
-      # Start ICP:
+      # Start AI Pose:
+      scale = self.scaleSliderWidget.value
+
+      previousMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
+
+      pred_poses = []
+      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      pred_poses = np.concatenate(pred_poses)
+      dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
+
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))
+
+    # ------------------------------ ICP with Pose ------------------------------
+    elif self.methodComboBox.currentText == "AI Pose Inference":
+      if self.pointCloudSelector.currentNode():
+        self.createPointCloud(stepCountString, maskImage)
+          
+      # Display image by moving slice offset
+      self.adjustSliceOffset()
+
+      # Start AI Pose:
+      scale = self.scaleSliderWidget.value
+
+      previousMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
+
+      pred_poses = []
+      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      pred_poses = np.concatenate(pred_poses)
+      dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
+
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))      
+
     # ------------------------------ Model ------------------------------
-    elif self.methodComboBox.currentText == "Model":
+    elif self.methodComboBox.currentText == "AI Pose + ICP":
       pass
       # if self.pointCloudSelector.currentNode():
       #   self.createPointCloud(stepCountString, maskImage)
@@ -426,11 +552,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       # previousMatrix = vtk.vtkMatrix4x4()
       # self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
-
-      # previousRotationMatrix = vtk.vtkMatrix4x4()
-      # for i in range(3):
-      #   for j in range(3):
-      #     previousRotationMatrix.SetElement(i, j, previousMatrix.GetElement(i, j))
 
       # pred_poses = []
       # pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
@@ -471,7 +592,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         cam_to_world = np.dot(source_to_target_transformation, cam_to_world)
         Ms.append(cam_to_world)
     return Ms
-
+  
   def MatrixFromRotation(self, angle, x, y, z, matrix):
     matrix.Identity()
 
@@ -583,9 +704,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         #z = depthImage[u][v]
 
         if (z is not np.nan) and (z < zThreshold):
-          world_x = (z * (u - (height/2)) / fx_d) * self.imageScaleBox.value
-          world_y = (z * (v - (width/2)) / fy_d) * self.imageScaleBox.value
-          world_z = z * self.depthScaleBox.value
+          world_x = (z * (u - (height/2)) / fx_d) * (self.imageScaleBox.value * self.centerlineScaleFactor)
+          world_y = (z * (v - (width/2)) / fy_d) * (self.imageScaleBox.value * self.centerlineScaleFactor)
+          world_z = z * self.depthScaleBox.value * self.centerlineScaleFactor
           points.InsertNextPoint(world_x, world_y, world_z)
           #points.InsertNextPoint(np.array([z * (u - (height/2)) / fx_d, z * (v - (width/2)) / fy_d, z / self.depthDividerBox.value]))
           if colorArray:
@@ -639,3 +760,100 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # modelPermDisplayNode.SetActiveScalarName("PointCloudColor")
     # modelPermDisplayNode.SetScalarRangeFlag(4)
     # # temp
+
+  def calculateAndSetICPTransform(self):
+    outputTrans = self.icpTransformSelector.currentNode()
+
+    fixedModel = self.baseModelSelector.currentNode()
+    movingModel = self.pointCloudSelector.currentNode()
+
+    # Harden models
+    hardenedFixedModelNode = slicer.vtkMRMLModelNode()
+    slicer.mrmlScene.AddNode(hardenedFixedModelNode)
+    fixedPolyData = vtk.vtkPolyData()
+    fixedPolyData.DeepCopy(fixedModel.GetPolyData())
+    hardenedFixedModelNode.SetAndObservePolyData(fixedPolyData)
+    fixedTransformNode = fixedModel.GetParentTransformNode()
+    if fixedTransformNode:
+      hardenedFixedModelNode.SetAndObserveTransformNodeID(fixedTransformNode.GetID())
+      hardenedFixedModelNode.HardenTransform()
+      #fixedPolyData = hardenedFixedModelNode.GetPolyData()
+    else:
+      fixedPolyData = fixedModel.GetPolyData()
+
+    hardenedMovingModelNode = slicer.vtkMRMLModelNode()
+    slicer.mrmlScene.AddNode(hardenedMovingModelNode)
+    movingPolyData = vtk.vtkPolyData()
+    movingPolyData.DeepCopy(movingModel.GetPolyData())
+    hardenedMovingModelNode.SetAndObservePolyData(movingPolyData)
+    movingTransformNode = movingModel.GetParentTransformNode()
+    if movingTransformNode:
+      hardenedMovingModelNode.SetAndObserveTransformNodeID(movingTransformNode.GetID())
+      hardenedMovingModelNode.HardenTransform()
+      
+      # Fix origin
+      inverseTransformMatrix = vtk.vtkMatrix4x4()
+      movingTransformNode.GetMatrixTransformToWorld(inverseTransformMatrix)
+      inverseTransformMatrix.Invert()
+
+      transform = vtk.vtkTransform()
+      transform.SetMatrix(inverseTransformMatrix)
+
+      transformFilter1 = vtk.vtkTransformPolyDataFilter()
+      transformFilter1.SetInputData(movingPolyData)
+      transformFilter1.SetTransform(transform)
+      transformFilter1.Update()
+      movingPolyData = transformFilter1.GetOutput()
+
+      transformFilter2 = vtk.vtkTransformPolyDataFilter()
+      transformFilter2.SetInputData(fixedPolyData)
+      transformFilter2.SetTransform(transform)
+      transformFilter2.Update()
+      fixedPolyData = transformFilter2.GetOutput()
+
+      #movingPolyData = hardenedMovingModelNode.GetPolyData()
+    else:
+      movingPolyData = movingModel.GetPolyData()
+
+    icp = vtk.vtkIterativeClosestPointTransform()
+    icp.SetSource(movingPolyData)
+    icp.SetTarget(fixedPolyData)
+    icp.GetLandmarkTransform().SetModeToSimilarity()
+    icp.SetMeanDistanceModeToAbsoluteValue()
+    icp.SetMaximumNumberOfIterations(int(self.icpIterationsSlider.value))
+    icp.SetMaximumMeanDistance(self.icpMaxDistanceSlider.value)
+    icp.SetMaximumNumberOfLandmarks(int(self.icpLandmarksSlider.value))
+    icp.SetCheckMeanDistance(int(self.checkMeanDistanceCheckBox.isChecked()))
+    icp.Update()
+
+    slicer.mrmlScene.RemoveNode(hardenedFixedModelNode)
+    slicer.mrmlScene.RemoveNode(hardenedMovingModelNode)
+
+    outputMatrix = vtk.vtkMatrix4x4()
+    icp.GetMatrix(outputMatrix)
+    outputTrans.SetAndObserveMatrixTransformToParent(outputMatrix)
+
+  def calculateClosestCenterlineRadius(self):
+    radiusCenterlineNode = self.centerlineSelector.currentNode()
+    currentMatrix = vtk.vtkMatrix4x4()
+    self.cameraAirwayPositionSelector.currentNode().GetMatrixTransformToWorld(currentMatrix)
+
+    closestPoint, idx = self.findClosestPoint(radiusCenterlineNode, [currentMatrix.GetElement(0,3), currentMatrix.GetElement(1,3), currentMatrix.GetElement(2,3)])
+    #print(closestPoint)
+    closestRadius = (radiusCenterlineNode.GetPolyData().GetPointData().GetArray("Radius").GetValue(idx))
+
+    return closestRadius
+
+  def findClosestPoint(self, pathNode, point):
+    pathPoints = pathNode.GetPolyData().GetPoints()
+    closestPoint = pathPoints.GetPoint(0)
+    closestDistance = vtk.vtkMath.Distance2BetweenPoints(point, closestPoint) #Distance is squared
+    closestIdx = -1
+    for idx in range(0, pathPoints.GetNumberOfPoints()):
+      pathPoint = pathPoints.GetPoint(idx)
+      distance = vtk.vtkMath.Distance2BetweenPoints(point, pathPoint)
+      if distance <= closestDistance:
+        closestDistance = distance
+        closestPoint = pathPoint
+        closestIdx = idx
+    return closestPoint, closestIdx
