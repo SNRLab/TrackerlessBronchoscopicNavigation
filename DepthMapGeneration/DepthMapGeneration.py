@@ -164,18 +164,30 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
       # Get the output of vtkExtractVOI
       cropped_image = extract_voi.GetOutput()
 
-      # flip_filter = vtk.vtkImageFlip()
-      # flip_filter.SetInputData(cropped_image)
+      flip_filter = vtk.vtkImageFlip()
+      flip_filter.SetInputData(cropped_image)
+      # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
+      flip_filter.SetFilteredAxis(1)  # Flip along y-axis
+      flip_filter.Update()
+      
+      # flip_filter2 = vtk.vtkImageFlip()
+      # flip_filter2.SetInputData(flip_filter.GetOutput())
       # # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
-      # flip_filter.SetFilteredAxis(0)  # Flip along y-axis
-      # flip_filter.Update()
+      # flip_filter2.SetFilteredAxis(0)  # Flip along y-axis
+      # flip_filter2.Update()      
+        
+      resize = vtk.vtkImageResize()
+      resize.SetResizeMethodToOutputDimensions();
+      resize.SetInputData(flip_filter.GetOutput())
+      resize.SetOutputDimensions(200, 200, 1)
+      resize.Update()
+      
+      change = vtk.vtkImageChangeInformation()
+      change.SetInputConnection(resize.GetOutputPort())
+      change.SetOutputSpacing(cropped_image.GetSpacing())
+      change.Update()
 
-      reslice = vtk.vtkImageReslice()
-      reslice.SetInputData(cropped_image)
-      reslice.SetOutputExtent(0, 192, 0, 192, 0, 0)
-      reslice.Update()
-
-      outputNode.SetAndObserveImageData(reslice.GetOutput())
+      outputNode.SetAndObserveImageData(change.GetOutput())
       outputNode.SetIJKToRASDirections(-1,0,0,0,-1,0,0,0,1)
 
       # # If you want to save the depth map as an image, you can use vtkPNGWriter
