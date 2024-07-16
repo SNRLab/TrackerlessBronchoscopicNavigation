@@ -230,14 +230,28 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
         rgbWriter.Write()
       if self.grayscaleSelector.currentNode():
         grayscaleImageData = self.grayscaleSelector.currentNode().GetImageData()
+        table = vtk.vtkScalarsToColors()
+        table.SetRange(0.0, 1.0)  # Set the range of your data values
+        convert = vtk.vtkImageMapToColors()
+        convert.SetLookupTable(table)
+        convert.SetOutputFormatToRGB()
+        convert.SetInputData(grayscaleImageData)
+        convert.Update()
         grayscaleWriter = vtk.vtkPNGWriter()
-        grayscaleWriter.SetInputData(grayscaleImageData)
+        grayscaleWriter.SetInputData(convert.GetOutput())
         grayscaleWriter.SetFileName(f'{grayFilename}.png')
         grayscaleWriter.Write()
       if self.depthSelector.currentNode():
         depthImageData = self.depthSelector.currentNode().GetImageData()
+        table = vtk.vtkScalarsToColors()
+        table.SetRange(0.99, 1.0)  # Set the range of your data values
+        convert = vtk.vtkImageMapToColors()
+        convert.SetLookupTable(table)
+        convert.SetOutputFormatToRGB()
+        convert.SetInputData(depthImageData)
+        convert.Update()
         depthWriter = vtk.vtkPNGWriter()
-        depthWriter.SetInputData(depthImageData)
+        depthWriter.SetInputData(convert.GetOutput())
         depthWriter.SetFileName(f'{depthFilename}.png')
         depthWriter.Write()
       if self.inputsFiducialSelector.currentNode():
