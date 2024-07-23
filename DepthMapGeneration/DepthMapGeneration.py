@@ -150,6 +150,7 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     cameraTransformMatrix = vtk.vtkMatrix4x4()
     cameraTransformNode.GetMatrixTransformToWorld(cameraTransformMatrix)
     camera = cameraNode.GetCamera()
+    camera.SetClippingRange(0.1,100)
 
     forward = [cameraTransformMatrix.GetElement(0, 2), cameraTransformMatrix.GetElement(1, 2), cameraTransformMatrix.GetElement(2, 2)]
     position = [cameraTransformMatrix.GetElement(0, 3), cameraTransformMatrix.GetElement(1, 3), cameraTransformMatrix.GetElement(2, 3)]
@@ -186,11 +187,12 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
   
   def setCameraRoll(self):
     cameraRollNode = self.cameraRollTransformSelector.currentNode()
+    cameraTransformNode = self.cameraTransformSelector.currentNode()
     upAngleVector = self.angle_to_unit_vector(self.upAngleSliderWidget.value) # Desired view up vector
     cameraMatrix = vtk.vtkMatrix4x4()
-    cameraRollNode.GetMatrixTransformToWorld(cameraMatrix)
-    currentUpVector = cameraMatrix.MultiplyPoint([0,0,1,0])
-    currentUpVector = [currentUpVector[0], currentUpVector[2], currentUpVector[1]]
+    cameraTransformNode.GetMatrixTransformToWorld(cameraMatrix)
+    currentUpVector = cameraMatrix.MultiplyPoint([0,1,0,0])
+    currentUpVector = [currentUpVector[0], currentUpVector[1], currentUpVector[2]]
     betweenAngleRad = vtk.vtkMath.AngleBetweenVectors(currentUpVector, upAngleVector)
     betweenAngleDeg = vtk.vtkMath.DegreesFromRadians(betweenAngleRad)
     # print(currentUpVector)
@@ -257,13 +259,17 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     newRgbNode.SetAndObserveImageData(vtk_image)
     #newRgbNode.SetIJKToRASDirections(1,0,0,0,1,0,0,0,1)
   
+  def screen_to_eye_depth_perspective(self, d, zNear, zFar):
+    depth = d * 2.0 - 1.0
+    return  (2.0 * zNear * zFar) / (zFar + zNear - depth * (zFar - zNear))
+
   def generateDepth(self):
     cameraNode = self.cameraSelector.currentNode()
     
     # Fix roll
     camera = cameraNode.GetCamera()
-    camera.SetViewUp(self.angle_to_unit_vector(self.upAngleSliderWidget.value))
-    #self.setCameraRoll()
+    #camera.SetViewUp(self.angle_to_unit_vector(self.upAngleSliderWidget.value))
+    self.setCameraRoll()
     
     # Undistort
     self.undistortImage()
@@ -307,35 +313,30 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
       # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
       flip_filter.SetFilteredAxis(0)  # Flip along y-axis
       flip_filter.Update()
-      
-      # flip_filter2 = vtk.vtkImageFlip()
-      # flip_filter2.SetInputData(flip_filter.GetOutput())
-      # # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
-      # flip_filter2.SetFilteredAxis(0)  # Flip along y-axis
-      # flip_filter2.Update()      
         
       resize = vtk.vtkImageResize()
-      resize.SetResizeMethodToOutputDimensions();
+      resize.SetResizeMethodToOutputDimensions()
       resize.SetInputData(flip_filter.GetOutput())
       resize.SetOutputDimensions(200, 200, 1)
       resize.Update()
-      
+
+      # Convert to Linear
+      vtkImage = resize.GetOutput()
+      vtk_data_array = vtkImage.GetPointData().GetScalars()
+      numpy_array = vtk.util.numpy_support.vtk_to_numpy(vtk_data_array)
+      zNear = camera.GetClippingRange()[0]
+      zFar = camera.GetClippingRange()[1]
+      numpy_array = self.screen_to_eye_depth_perspective(numpy_array, zNear, zFar)
+      vtk_data_array = vtk.util.numpy_support.numpy_to_vtk(numpy_array)
+      vtkImage.GetPointData().SetScalars(vtk_data_array)
+
       change = vtk.vtkImageChangeInformation()
       change.SetInputConnection(resize.GetOutputPort())
       change.SetOutputSpacing(cropped_image.GetSpacing())
       change.Update()
-
+      
       outputNode.SetAndObserveImageData(change.GetOutput())
       outputNode.SetIJKToRASDirections(1,0,0,0,1,0,0,0,1)
-
-      # # If you want to save the depth map as an image, you can use vtkPNGWriter
-      # writer = vtk.vtkPNGWriter()
-      # writer.SetFileName("depth_map.png")
-      # writer.SetInputData(depth_map)
-      # writer.Write()
-
-      # # Print a success message
-      # print("The depth map was successfully saved as depth_map.png")
 
 class DepthMapGenerationLogic:
   def __init__(self):

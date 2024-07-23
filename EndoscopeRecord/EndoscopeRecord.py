@@ -224,35 +224,50 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
       depthImageData = None
       if self.rgbSelector.currentNode():
         rgbImageData = self.rgbSelector.currentNode().GetImageData()
+
+        flip_filter = vtk.vtkImageFlip()
+        flip_filter.SetInputData(rgbImageData)
+        # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
+        flip_filter.SetFilteredAxis(0)  # Flip along y-axis
+        flip_filter.Update()
+
         rgbWriter = vtk.vtkPNGWriter()
-        rgbWriter.SetInputData(rgbImageData)
+        rgbWriter.SetInputData(flip_filter.GetOutput())
         rgbWriter.SetFileName(f'{filename}.png')
         rgbWriter.Write()
       if self.grayscaleSelector.currentNode():
         grayscaleImageData = self.grayscaleSelector.currentNode().GetImageData()
+
+        flip_filter = vtk.vtkImageFlip()
+        flip_filter.SetInputData(grayscaleImageData)
+        # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
+        flip_filter.SetFilteredAxis(0)  # Flip along y-axis
+        flip_filter.Update()
+
         table = vtk.vtkScalarsToColors()
         table.SetRange(0.0, 1.0)  # Set the range of your data values
         convert = vtk.vtkImageMapToColors()
         convert.SetLookupTable(table)
         convert.SetOutputFormatToRGB()
-        convert.SetInputData(grayscaleImageData)
+        convert.SetInputData(flip_filter.GetOutput())
         convert.Update()
         grayscaleWriter = vtk.vtkPNGWriter()
         grayscaleWriter.SetInputData(convert.GetOutput())
         grayscaleWriter.SetFileName(f'{grayFilename}.png')
         grayscaleWriter.Write()
       if self.depthSelector.currentNode():
-        depthImageData = self.depthSelector.currentNode().GetImageData()
-        table = vtk.vtkScalarsToColors()
-        table.SetRange(0.99, 1.0)  # Set the range of your data values
-        convert = vtk.vtkImageMapToColors()
-        convert.SetLookupTable(table)
-        convert.SetOutputFormatToRGB()
-        convert.SetInputData(depthImageData)
-        convert.Update()
-        depthWriter = vtk.vtkPNGWriter()
-        depthWriter.SetInputData(convert.GetOutput())
-        depthWriter.SetFileName(f'{depthFilename}.png')
+        depthImageData = self.outputImageSelector.currentNode().GetImageData()
+
+        flip_filter = vtk.vtkImageFlip()
+        flip_filter.SetInputData(depthImageData)
+        # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
+        flip_filter.SetFilteredAxis(0)  # Flip along y-axis
+        flip_filter.Update()
+
+        depthWriter = vtk.vtkTIFFWriter()
+        depthWriter.SetCompressionToNoCompression()
+        depthWriter.SetInputData(flip_filter.GetOutput())
+        depthWriter.SetFileName(f'{depthFilename}.tiff')
         depthWriter.Write()
       if self.inputsFiducialSelector.currentNode():
         # inputsImageData = self.generateInputsImage()
