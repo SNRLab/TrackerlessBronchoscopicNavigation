@@ -175,8 +175,9 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     self.depthTimer.stop()
     
   def angle_to_unit_vector(self, angle):
-    vector = np.array([0.0, 0.0, 1.0])
-    axis = np.array([0.0, 1.0, 0.0]) 
+    vector = np.array([0.0, 1.0, 0.0])
+    #axis = np.array([0.0, 1.0, 0.0]) 
+    axis = np.array([0.0, 0.0, 1.0]) 
     
     transform = vtk.vtkTransform()
     transform.RotateWXYZ(angle, axis)
@@ -238,14 +239,19 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     vtk_image = vtk.vtkImageData()
     vtk_image.SetDimensions(dst.shape[1], dst.shape[0], 1)
     vtk_image.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 3)
+    
+    #flattened_dst = dst.flatten()
+    vtk_array = vtk.util.numpy_support.numpy_to_vtk(dst.ravel(), deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+    vtk_array.SetNumberOfComponents(3)
+    vtk_image.GetPointData().SetScalars(vtk_array)
 
-    # Copy pixel data from the OpenCV image to vtkImageData
-    for y in range(dst.shape[0]):
-        for x in range(dst.shape[1]):
-            pixel = dst[y, x]
-            vtk_image.SetScalarComponentFromFloat(x, y, 0, 0, pixel[0])
-            vtk_image.SetScalarComponentFromFloat(x, y, 0, 1, pixel[1])
-            vtk_image.SetScalarComponentFromFloat(x, y, 0, 2, pixel[2])
+    # # Copy pixel data from the OpenCV image to vtkImageData
+    # for y in range(dst.shape[0]):
+        # for x in range(dst.shape[1]):
+            # pixel = dst[y, x]
+            # vtk_image.SetScalarComponentFromFloat(x, y, 0, 0, pixel[0])
+            # vtk_image.SetScalarComponentFromFloat(x, y, 0, 1, pixel[1])
+            # vtk_image.SetScalarComponentFromFloat(x, y, 0, 2, pixel[2])
 
     newRgbNode = self.undistortImageSelector.currentNode()
     newRgbNode.SetAndObserveImageData(vtk_image)
