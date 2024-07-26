@@ -256,7 +256,7 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
         grayscaleWriter.SetFileName(f'{grayFilename}.png')
         grayscaleWriter.Write()
       if self.depthSelector.currentNode():
-        depthImageData = self.outputImageSelector.currentNode().GetImageData()
+        depthImageData = self.depthSelector.currentNode().GetImageData()
 
         flip_filter = vtk.vtkImageFlip()
         flip_filter.SetInputData(depthImageData)

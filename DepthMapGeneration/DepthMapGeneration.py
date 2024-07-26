@@ -196,8 +196,13 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     betweenAngleRad = vtk.vtkMath.AngleBetweenVectors(currentUpVector, upAngleVector)
     betweenAngleDeg = vtk.vtkMath.DegreesFromRadians(betweenAngleRad)
     # print(currentUpVector)
-    # print(upAngleVector)
+    # # print(upAngleVector)
     # print(betweenAngleDeg)
+    
+
+    if self.upAngleSliderWidget.value > 120:
+      betweenAngleRad += math.pi
+
     
     cameraRollMatrix = vtk.vtkMatrix4x4()
     cameraRollMatrix.SetElement(0,0,math.cos(-betweenAngleRad))
