@@ -96,8 +96,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepModeCollapsibleButton.collapsed = False
     self.layout.addWidget(self.stepModeCollapsibleButton)
     stepModeLayout = qt.QFormLayout(self.stepModeCollapsibleButton)
-
-    self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/upsample_4gauss_mask_0.0001/data")
+    self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/28_06_2024/depth_gauss_mask_min_pose_longterm_consistency_0.0001/data")
     self.gtPathBox.setReadOnly(True)
     self.gtPathButton = qt.QPushButton("...")
     self.gtPathButton.clicked.connect(self.select_directory_gt)
@@ -105,6 +104,15 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     gtPathBoxLayout.addWidget(self.gtPathBox)
     gtPathBoxLayout.addWidget(self.gtPathButton)
     stepModeLayout.addRow("Data: ", gtPathBoxLayout)
+
+    self.modelPathBox = qt.QLineEdit("D:/MeghaData/Data/28_06_2024/depth_gauss_mask_min_pose_longterm_consistency_0.0001/model")
+    self.modelPathBox.setReadOnly(True)
+    self.modelPathButton = qt.QPushButton("...")
+    self.modelPathButton.clicked.connect(self.select_directory_model)
+    modelPathBoxLayout = qt.QHBoxLayout()
+    modelPathBoxLayout.addWidget(self.modelPathBox)
+    modelPathBoxLayout.addWidget(self.modelPathButton)
+    stepModeLayout.addRow("Model: ", modelPathBoxLayout)
 
     self.methodComboBox = qt.QComboBox()
     self.methodComboBox.addItem('ICP Only')
@@ -206,7 +214,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.centerlineSelector.addEnabled = True
     self.centerlineSelector.removeEnabled = True
     self.centerlineSelector.renameEnabled = True
-    self.centerlineSelector.noneEnabled = False
+    self.centerlineSelector.noneEnabled = True
     self.centerlineSelector.showHidden = False
     self.centerlineSelector.showChildNodeTypes = False
     self.centerlineSelector.setMRMLScene(slicer.mrmlScene)
@@ -344,6 +352,11 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     directory = qt.QFileDialog.getExistingDirectory(self.parent, "Select Directory")
     if directory:
       self.gtPathBox.setText(directory)
+
+  def select_directory_model(self):
+    directory = qt.QFileDialog.getExistingDirectory(self.parent, "Select Directory")
+    if directory:
+      self.modelPathBox.setText(directory)
 
   def onStepTimer(self):
     if self.stepTimerButton.isChecked():
@@ -512,7 +525,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
       pred_poses = []
-      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
       pred_poses = np.concatenate(pred_poses)
       dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
 
@@ -533,7 +546,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
       pred_poses = []
-      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
       pred_poses = np.concatenate(pred_poses)
       dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
 
@@ -554,7 +567,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       # self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
       # pred_poses = []
-      # pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['arr_0'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['arr_0'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      # pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
       # pred_poses = np.concatenate(pred_poses)
       # dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
 
