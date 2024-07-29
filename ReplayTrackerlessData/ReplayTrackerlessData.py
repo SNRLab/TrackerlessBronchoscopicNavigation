@@ -13,6 +13,7 @@ from PIL import Image
 from Resources import layers
 import re
 import json
+from scipy.spatial.transform import Rotation as R
 
 class ReplayTrackerlessData(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
@@ -117,6 +118,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.methodComboBox = qt.QComboBox()
     self.methodComboBox.addItem('ICP Only')
     self.methodComboBox.addItem('Recorded AI Pose')
+    self.methodComboBox.addItem('Recorded AI Pose with Nudge')
     self.methodComboBox.addItem('AI Pose Inference')
     self.methodComboBox.addItem('AI Pose + ICP')
     self.methodComboBox.addItem('Ground Truth')
@@ -398,7 +400,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
   def onLoadPred(self):
     self.translations_pred = np.load(f'{self.gtPathBox.text}/translation.npz')
-    self.axis_angle_pred = np.load(f'{self.gtPathBox.text}/axisangle.npz')
+    self.euler_angle_pred = np.load(f'{self.gtPathBox.text}/eulerangle.npz')
     self.pose_pred = np.load(f'{self.gtPathBox.text}/pose_prediction.npz')
 
   def createPointCloud(self, stepCountString, maskImage):
@@ -510,7 +512,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       
       # Start ICP:
       self.calculateAndSetICPTransform()
-    # ------------------------------ ICP with Pose ------------------------------
+    # ------------------------------ Recorded Pose ------------------------------
     elif self.methodComboBox.currentText == "Recorded AI Pose":
       if self.pointCloudSelector.currentNode():
         self.createPointCloud(stepCountString, maskImage)
@@ -524,15 +526,15 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
-      pred_poses = []
-      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
-      pred_poses = np.concatenate(pred_poses)
-      dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
+      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale)
 
-      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))
+      combinedMatrix = vtk.vtkMatrix4x4()
+      combinedMatrix.Multiply4x4(previousMatrix, self.numpy_to_vtk_matrix(pred_pose), combinedMatrix)
+
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
 
     # ------------------------------ ICP with Pose ------------------------------
-    elif self.methodComboBox.currentText == "AI Pose Inference":
+    elif self.methodComboBox.currentText == "Recorded AI Pose with Nudge":
       if self.pointCloudSelector.currentNode():
         self.createPointCloud(stepCountString, maskImage)
           
@@ -545,12 +547,12 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
-      pred_poses = []
-      pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
-      pred_poses = np.concatenate(pred_poses)
-      dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
+      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale)
 
-      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))      
+      combinedMatrix = vtk.vtkMatrix4x4()
+      combinedMatrix.Multiply4x4(previousMatrix, self.numpy_to_vtk_matrix(pred_pose), combinedMatrix)
+
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
 
     # ------------------------------ Model ------------------------------
     elif self.methodComboBox.currentText == "AI Pose + ICP":
@@ -567,7 +569,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       # self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
       # pred_poses = []
-      # pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.axis_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
+      # pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
       # pred_poses = np.concatenate(pred_poses)
       # dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
 
@@ -575,6 +577,15 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
     self.stepCount = self.stepCount + self.stepSkipBox.value
     self.stepLabel.setText(stepCountString)
+
+  def get_transform(self, euler, translation, scale):
+    # the output of the network is in radians
+    final_mat = np.eye(4)
+    final_mat[:3,:3] = R.from_euler('zyx', euler.cpu().numpy().squeeze()).as_matrix()
+    T = np.eye(4)
+    T[:3,3] = (translation.cpu().numpy().squeeze()) * scale
+    M = np.matmul(T, final_mat)
+    return M
 
   def vtk_to_numpy_matrix(self, vtk_matrix):
     numpy_matrix = np.zeros((4, 4))
