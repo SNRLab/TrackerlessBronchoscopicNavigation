@@ -119,8 +119,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.methodComboBox.addItem('ICP Only')
     self.methodComboBox.addItem('Recorded AI Pose')
     self.methodComboBox.addItem('Recorded AI Pose with Nudge')
-    self.methodComboBox.addItem('AI Pose Inference')
-    self.methodComboBox.addItem('AI Pose + ICP')
+    self.methodComboBox.addItem('Recorded AI Pose with ICP')
     self.methodComboBox.addItem('Ground Truth')
     self.methodComboBox.addItem('None')
     self.methodComboBox.setCurrentIndex(1)
@@ -554,29 +553,40 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
 
-    # ------------------------------ Model ------------------------------
-    elif self.methodComboBox.currentText == "AI Pose + ICP":
-      pass
-      # if self.pointCloudSelector.currentNode():
-      #   self.createPointCloud(stepCountString, maskImage)
+    # ------------------------------ ICP with Pose ------------------------------
+    elif self.methodComboBox.currentText == "Recorded AI Pose with ICP":
+      if self.pointCloudSelector.currentNode():
+        self.createPointCloud(stepCountString, maskImage)
+          
+      # Display image by moving slice offset
+      self.adjustSliceOffset()
 
-      # # Display image by moving slice offset
-      # self.adjustSliceOffset()
+      # Start AI Pose:
+      scale = self.scaleSliderWidget.value
 
-      # scale = self.scaleSliderWidget.value
+      previousMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
-      # previousMatrix = vtk.vtkMatrix4x4()
-      # self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
+      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale)
 
-      # pred_poses = []
-      # pred_poses.append(layers.transformation_from_parameters(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]) * scale).cpu().numpy())
-      # pred_poses = np.concatenate(pred_poses)
-      # dump_our = np.array(self.dump(self.vtk_to_numpy_matrix(previousMatrix), pred_poses))
+      combinedMatrix = vtk.vtkMatrix4x4()
+      combinedMatrix.Multiply4x4(previousMatrix, self.numpy_to_vtk_matrix(pred_pose), combinedMatrix)
 
-      # self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(self.numpy_to_vtk_matrix(dump_our[1]))
+      # # Apply past ICP transform to pose transform
+      # childMatrix = vtk.vtkMatrix4x4()
+      # self.icpTransformSelector.currentNode().GetMatrixTransformToParent(childMatrix)
+      # parentMatrix = vtk.vtkMatrix4x4()
+      # self.icpTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToWorld(parentMatrix)
+      # combinedMatrix = vtk.vtkMatrix4x4()
+      # combinedMatrix.Multiply4x4(parentMatrix, childMatrix, combinedMatrix)
+      # self.inputTransformSelector.currentNode().SetMatrixTransformToParent(combinedMatrix)
+      # identityMatrix = vtk.vtkMatrix4x4()
+      # self.icpTransformSelector.currentNode().SetMatrixTransformToParent(identityMatrix)
+      
+      # Start ICP:
+      self.calculateAndSetICPTransform()      
 
-    self.stepCount = self.stepCount + self.stepSkipBox.value
-    self.stepLabel.setText(stepCountString)
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)      
 
   def get_transform(self, euler, translation, scale):
     # the output of the network is in radians
