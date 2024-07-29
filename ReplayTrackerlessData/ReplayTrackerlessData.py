@@ -180,8 +180,35 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.scaleSliderWidget.minimum = 0.00
     self.scaleSliderWidget.maximum = 10000.00
     self.scaleSliderWidget.singleStep = 0.01
-    self.scaleSliderWidget.value = 200.00
+    self.scaleSliderWidget.value = 18.00
     stepModeLayout.addRow("Scale Factor:", self.scaleSliderWidget)
+
+    self.nudgeInterval = qt.QSpinBox()
+    self.nudgeInterval.setSingleStep(1)
+    self.nudgeInterval.setMaximum(100)
+    self.nudgeInterval.setMinimum(1)
+    self.nudgeInterval.value = 3
+    stepModeLayout.addRow("Nudge Interval: ", self.nudgeInterval)
+
+    self.nudgeFactorWidget = ctk.ctkSliderWidget()
+    self.nudgeFactorWidget.setDecimals(2)
+    self.nudgeFactorWidget.minimum = 0.00
+    self.nudgeFactorWidget.maximum = 10000.00
+    self.nudgeFactorWidget.singleStep = 0.01
+    self.nudgeFactorWidget.value = 5.00
+    stepModeLayout.addRow("Nudge Factor:", self.nudgeFactorWidget)
+
+    # self.nudgeTransformSelector = slicer.qMRMLNodeComboBox()
+    # self.nudgeTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+    # self.nudgeTransformSelector.selectNodeUponCreation = False
+    # self.nudgeTransformSelector.noneEnabled = False
+    # self.nudgeTransformSelector.addEnabled = True
+    # self.nudgeTransformSelector.removeEnabled = True
+    # self.nudgeTransformSelector.setMRMLScene(slicer.mrmlScene)
+    # stepModeLayout.addRow("Nudge Transform: ", self.nudgeTransformSelector)
+
+    self.nudgeLabel = qt.QLabel("")
+    stepModeLayout.addRow(self.nudgeLabel)
 
     # # Model Mode collapsible button
     # self.modelModeCollapsibleButton = ctk.ctkCollapsibleButton()
@@ -348,6 +375,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.cameraAirwayPositionSelector.setCurrentNode(slicer.util.getNode('AirwayPosition'))
     self.baseModelSelector.setCurrentNode(slicer.util.getNode('airway'))
     self.icpTransformSelector.setCurrentNode(slicer.util.getNode('ICPTransform'))
+    # self.nudgeTransformSelector.setCurrentNode(slicer.util.getNode('NudgeTransform'))
 
   def select_directory_gt(self):
     directory = qt.QFileDialog.getExistingDirectory(self.parent, "Select Directory")
@@ -381,6 +409,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     green = layoutManager.sliceWidget('Green')
     greenLogic = green.sliceLogic()
     greenLogic.SetSliceOffset(0)
+
+    self.nudgeLabel.text = ""
     
     resultMatrix = vtk.vtkMatrix4x4()
     if self.inputTransformSelector.currentNode():
@@ -388,6 +418,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     icpMatrix = vtk.vtkMatrix4x4()
     if self.icpTransformSelector.currentNode():
       self.icpTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(icpMatrix)
+    # nudgeMatrix = vtk.vtkMatrix4x4()
+    # if self.nudgeTransformSelector.currentNode():
+    #   self.nudgeTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(nudgeMatrix)
   
   def onMaskSelection(self, index):
     if index == 1:
@@ -461,7 +494,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       self.adjustSliceOffset()
 
       # Start Load Ground Truth:
-
       prefix = "frame_data"
       frameDataFilename = ""
       for filename in os.listdir(self.gtPathBox.text):
@@ -552,6 +584,37 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       combinedMatrix.Multiply4x4(previousMatrix, self.numpy_to_vtk_matrix(pred_pose), combinedMatrix)
 
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
+      
+      if ((self.stepCount-1) % self.nudgeInterval.value) == 0 and self.stepCount != 1:
+        radiusCenterlineNode = self.centerlineSelector.currentNode()
+        currentMatrix = vtk.vtkMatrix4x4()
+        self.inputTransformSelector.currentNode().GetMatrixTransformToWorld(currentMatrix)
+        closestPoint, idx = self.findClosestPoint(radiusCenterlineNode, [currentMatrix.GetElement(0,3), currentMatrix.GetElement(1,3), currentMatrix.GetElement(2,3)])
+        nudgeVector = [closestPoint[0]-currentMatrix.GetElement(0,3), closestPoint[1]-currentMatrix.GetElement(1,3), closestPoint[2]-currentMatrix.GetElement(2,3)]
+        nudgeVector = nudgeVector + [0]
+        nudgeVectorTransformed = [0,0,0,0]
+        currentMatrix.SetElement(0,3,0); currentMatrix.SetElement(1,3,0); currentMatrix.SetElement(2,3,0)
+        currentMatrix.MultiplyPoint(nudgeVector, nudgeVectorTransformed)
+        # print(nudgeVector)
+        # print(nudgeVectorTransformed)
+        nudgeNorm = np.linalg.norm(nudgeVectorTransformed)
+        # print(nudgeNorm)
+        # print(closestPoint)
+        # print([currentMatrix.GetElement(0,3), currentMatrix.GetElement(1,3), currentMatrix.GetElement(2,3)])
+        nudgeVectorTransformed = nudgeVectorTransformed/nudgeNorm
+        nudgeFactor = min(nudgeNorm, self.nudgeFactorWidget.value)
+        nudgeVectorTransformed = nudgeVectorTransformed * nudgeFactor
+
+        nudgedMatrix = vtk.vtkMatrix4x4()
+        self.inputTransformSelector.currentNode().GetMatrixTransformToParent(nudgedMatrix)
+        nudgedMatrix.SetElement(0,3,nudgedMatrix.GetElement(0,3)-nudgeVectorTransformed[0])
+        nudgedMatrix.SetElement(1,3,nudgedMatrix.GetElement(1,3)-nudgeVectorTransformed[1])
+        nudgedMatrix.SetElement(2,3,nudgedMatrix.GetElement(2,3)-nudgeVectorTransformed[2])
+        self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(nudgedMatrix)
+
+        self.nudgeLabel.text = f'Nudge by {nudgeFactor}'
+      else:
+        self.nudgeLabel.text = ""
 
     # ------------------------------ ICP with Pose ------------------------------
     elif self.methodComboBox.currentText == "Recorded AI Pose with ICP":
@@ -572,21 +635,12 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, self.numpy_to_vtk_matrix(pred_pose), combinedMatrix)
 
-      # # Apply past ICP transform to pose transform
-      # childMatrix = vtk.vtkMatrix4x4()
-      # self.icpTransformSelector.currentNode().GetMatrixTransformToParent(childMatrix)
-      # parentMatrix = vtk.vtkMatrix4x4()
-      # self.icpTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToWorld(parentMatrix)
-      # combinedMatrix = vtk.vtkMatrix4x4()
-      # combinedMatrix.Multiply4x4(parentMatrix, childMatrix, combinedMatrix)
-      # self.inputTransformSelector.currentNode().SetMatrixTransformToParent(combinedMatrix)
-      # identityMatrix = vtk.vtkMatrix4x4()
-      # self.icpTransformSelector.currentNode().SetMatrixTransformToParent(identityMatrix)
-      
       # Start ICP:
       self.calculateAndSetICPTransform()      
 
-      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)      
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
+    self.stepCount = self.stepCount + self.stepSkipBox.value
+    self.stepLabel.setText(stepCountString)
 
   def get_transform(self, euler, translation, scale):
     # the output of the network is in radians
