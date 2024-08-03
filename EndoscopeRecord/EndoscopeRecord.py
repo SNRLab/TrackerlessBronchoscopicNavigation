@@ -74,6 +74,15 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
     self.rgbSelector.showHidden = False
     self.rgbSelector.setMRMLScene( slicer.mrmlScene )
     controlLayout.addRow("RGB Image:", self.rgbSelector)
+    
+    self.rgbSelector2 = slicer.qMRMLNodeComboBox()
+    self.rgbSelector2.nodeTypes = ["vtkMRMLVectorVolumeNode"]
+    self.rgbSelector2.selectNodeUponCreation = False
+    self.rgbSelector2.noneEnabled = True
+    self.rgbSelector2.addEnabled = False
+    self.rgbSelector2.showHidden = False
+    self.rgbSelector2.setMRMLScene( slicer.mrmlScene )
+    controlLayout.addRow("RGB Image 2:", self.rgbSelector2)
 
     self.grayscaleSelector = slicer.qMRMLNodeComboBox()
     self.grayscaleSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
@@ -214,6 +223,7 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
     if self.imagePathBox.text:
       timestamp_millis = int(time.time() * 1000)
       filename = fr'{self.imagePathBox.text}/rgb_{timestamp_millis}'
+      filename2 = fr'{self.imagePathBox.text}/distorted_{timestamp_millis}'
       grayFilename = fr'{self.imagePathBox.text}/gray_{timestamp_millis}'
       depthFilename = fr'{self.imagePathBox.text}/depth_{timestamp_millis}'
       #inputsFilename = fr'{self.imagePathBox.text}/input_{timestamp_millis}'
@@ -235,6 +245,19 @@ class EndoscopeRecordWidget(ScriptedLoadableModuleWidget):
         rgbWriter.SetInputData(flip_filter.GetOutput())
         rgbWriter.SetFileName(f'{filename}.png')
         rgbWriter.Write()
+      if self.rgbSelector2.currentNode():
+        rgbImageData2 = self.rgbSelector2.currentNode().GetImageData()
+
+        flip_filter2 = vtk.vtkImageFlip()
+        flip_filter2.SetInputData(rgbImageData2)
+        # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
+        flip_filter2.SetFilteredAxis(0)  # Flip along y-axis
+        flip_filter2.Update()
+
+        rgbWriter2 = vtk.vtkPNGWriter()
+        rgbWriter2.SetInputData(flip_filter2.GetOutput())
+        rgbWriter2.SetFileName(f'{filename2}.png')
+        rgbWriter2.Write()
       if self.grayscaleSelector.currentNode():
         grayscaleImageData = self.grayscaleSelector.currentNode().GetImageData()
 

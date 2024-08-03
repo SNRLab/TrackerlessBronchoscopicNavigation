@@ -62,13 +62,13 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     self.FPSBox.setMaximum(144)
     self.FPSBox.setMinimum(1)
     self.FPSBox.setSuffix(" FPS")
-    self.FPSBox.value = 60
+    self.FPSBox.value = 40
     controlLayout.addRow("Target Rate:", self.FPSBox)
 
     self.fovSliderWidget = ctk.ctkSliderWidget()
     self.fovSliderWidget.setDecimals(2)
     self.fovSliderWidget.minimum = 0.00
-    self.fovSliderWidget.maximum = 360.00
+    self.fovSliderWidget.maximum = 720.00
     self.fovSliderWidget.singleStep = 0.01
     self.fovSliderWidget.value = 127.018
     controlLayout.addRow("Field of View:", self.fovSliderWidget)
@@ -76,7 +76,7 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     self.upAngleSliderWidget = ctk.ctkSliderWidget()
     self.upAngleSliderWidget.setDecimals(2)
     self.upAngleSliderWidget.minimum = 0.00
-    self.upAngleSliderWidget.maximum = 360.00
+    self.upAngleSliderWidget.maximum = 720.00
     self.upAngleSliderWidget.singleStep = 1.00
     self.upAngleSliderWidget.value = 0.00
     controlLayout.addRow("Roll Angle:", self.upAngleSliderWidget)
@@ -158,7 +158,7 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     camera.SetFocalPoint(position[0] + forward[0], position[1] + forward[1], position[2] + forward[2])
     camera.SetPosition(position)
     #camera.SetViewUp(self.angle_to_unit_vector(self.upAngleSliderWidget.value))
-    #camera.SetViewUp([0.0,0.0,1.0])
+    camera.SetViewUp([0.0,0.0,1.0])
     
     wcx = -2*(97.48221807028696 - (200)/2) / 200
     wcy =  2*(101.56844672451034 - (200)/2) / 200
@@ -186,31 +186,32 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     return transform.TransformVector(vector)
   
   def setCameraRoll(self):
-    cameraRollNode = self.cameraRollTransformSelector.currentNode()
-    cameraTransformNode = self.cameraTransformSelector.currentNode()
+    # cameraRollNode = self.cameraRollTransformSelector.currentNode()
+    # cameraTransformNode = self.cameraTransformSelector.currentNode()
     upAngleVector = self.angle_to_unit_vector(self.upAngleSliderWidget.value) # Desired view up vector
-    cameraMatrix = vtk.vtkMatrix4x4()
-    cameraTransformNode.GetMatrixTransformToWorld(cameraMatrix)
-    currentUpVector = cameraMatrix.MultiplyPoint([0,1,0,0])
-    currentUpVector = [currentUpVector[0], currentUpVector[1], currentUpVector[2]]
-    betweenAngleRad = vtk.vtkMath.AngleBetweenVectors(currentUpVector, upAngleVector)
-    betweenAngleDeg = vtk.vtkMath.DegreesFromRadians(betweenAngleRad)
-    # print(currentUpVector)
-    # # print(upAngleVector)
-    # print(betweenAngleDeg)
+    # cameraMatrix = vtk.vtkMatrix4x4()
+    # cameraTransformNode.GetMatrixTransformToWorld(cameraMatrix)
+    # currentUpVector = cameraMatrix.MultiplyPoint([0,0,1,0])
+    # currentUpVector = [currentUpVector[0], currentUpVector[1], currentUpVector[2]]
+    # betweenAngleRad = vtk.vtkMath.AngleBetweenVectors(currentUpVector, upAngleVector)
+    # betweenAngleDeg = vtk.vtkMath.DegreesFromRadians(betweenAngleRad)
     
+    # When replaying the data just make sure the SetViewUp is set to what it was to visually match 
+    cameraNode = self.cameraSelector.currentNode()
+    camera = cameraNode.GetCamera()
+    camera.SetViewUp(upAngleVector)
+    
+    # if self.upAngleSliderWidget.value > 120:
+      # betweenAngleRad += math.pi
 
-    if self.upAngleSliderWidget.value > 120:
-      betweenAngleRad += math.pi
-
     
-    cameraRollMatrix = vtk.vtkMatrix4x4()
-    cameraRollMatrix.SetElement(0,0,math.cos(-betweenAngleRad))
-    cameraRollMatrix.SetElement(0,1,-math.sin(-betweenAngleRad))
-    cameraRollMatrix.SetElement(1,0,math.sin(-betweenAngleRad))
-    cameraRollMatrix.SetElement(1,1,math.cos(-betweenAngleRad))
+    # cameraRollMatrix = vtk.vtkMatrix4x4()
+    # cameraRollMatrix.SetElement(0,0,math.cos(-betweenAngleRad))
+    # cameraRollMatrix.SetElement(0,1,-math.sin(-betweenAngleRad))
+    # cameraRollMatrix.SetElement(1,0,math.sin(-betweenAngleRad))
+    # cameraRollMatrix.SetElement(1,1,math.cos(-betweenAngleRad))
     
-    cameraRollNode.SetAndObserveMatrixTransformToParent(cameraRollMatrix)
+    # cameraRollNode.SetAndObserveMatrixTransformToParent(cameraRollMatrix)
   
   def undistortImage(self):
     self.setCameraRoll()
