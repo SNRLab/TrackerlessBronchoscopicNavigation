@@ -97,7 +97,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepModeCollapsibleButton.collapsed = False
     self.layout.addWidget(self.stepModeCollapsibleButton)
     stepModeLayout = qt.QFormLayout(self.stepModeCollapsibleButton)
-    self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/phantom2_07_31_2024/processed_phantom_fullpaths/1/new_renamed")
+    self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/phantom2_07_31_2024/processed_phantom_fullpaths_results/1/new_renamed")
     self.gtPathBox.setReadOnly(True)
     self.gtPathButton = qt.QPushButton("...")
     self.gtPathButton.clicked.connect(self.select_directory_gt)
@@ -376,7 +376,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.layout.addStretch(1)
 
   def onAutoInputs(self):
-    self.imageSelector.setCurrentNode(slicer.util.getNode('0000000001'))
+    #self.imageSelector.setCurrentNode(slicer.util.getNode('0000000001'))
     self.inputTransformSelector.setCurrentNode(slicer.util.getNode('Pose'))
     self.pointCloudSelector.setCurrentNode(slicer.util.getNode('PointCloud'))
     self.centerlineSelector.setCurrentNode(slicer.util.getNode('CenterlineModel'))
@@ -490,13 +490,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       self.stepTimerButton.setChecked(False)
       self.onStepTimer()
       
-    # Calculates scale from centerline for the next step from the current step if there is a centerline
-    if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode():
-      closestRadius = self.calculateClosestCenterlineRadius()
-      if self.stepCount <= 1:
-        self.centerlineStartRadius = closestRadius
-      self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
-      self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
     # ------------------------------ Ground Truth ------------------------------
     if self.methodComboBox.currentText == "Ground Truth":
       if self.pointCloudSelector.currentNode():
@@ -606,19 +599,20 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
-
-      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
       
       if ((self.stepCount-1) % self.nudgeInterval.value) == 0 and self.stepCount != 1:
         radiusCenterlineNode = self.centerlineSelector.currentNode()
-        currentMatrix = vtk.vtkMatrix4x4()
-        self.inputTransformSelector.currentNode().GetMatrixTransformToWorld(currentMatrix)
+        #currentMatrix = vtk.vtkMatrix4x4()
+        #self.inputTransformSelector.currentNode().GetMatrixTransformToWorld(currentMatrix)
         inverseParentMatrix = vtk.vtkMatrix4x4()
         self.inputTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToWorld(inverseParentMatrix)
+        combinedMatrix_world = vtk.vtkMatrix4x4()
+        combinedMatrix_world.Multiply4x4(inverseParentMatrix, combinedMatrix, combinedMatrix_world)
         inverseParentMatrix.Invert()
 
         # Closest point on centerline
-        closestPoint, idx = self.findClosestPoint(radiusCenterlineNode, [currentMatrix.GetElement(0,3), currentMatrix.GetElement(1,3), currentMatrix.GetElement(2,3)])
+        #closestPoint, idx = self.findClosestPoint(radiusCenterlineNode, [currentMatrix.GetElement(0,3), currentMatrix.GetElement(1,3), currentMatrix.GetElement(2,3)])
+        closestPoint = self.findClosestPointOnLine(radiusCenterlineNode, [combinedMatrix_world.GetElement(0,3), combinedMatrix_world.GetElement(1,3), combinedMatrix_world.GetElement(2,3)])
         closestPoint = list(closestPoint) + [1]
         closestPointTransformed = [0,0,0,1]
         inverseParentMatrix.MultiplyPoint(closestPoint, closestPointTransformed) # in pose space
@@ -628,16 +622,22 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         nudgeFactor = min(nudgeNorm, self.nudgeFactorWidget.value)
         nudgeVector = (nudgeVector/nudgeNorm) * nudgeFactor
         
-        nudgedMatrix = vtk.vtkMatrix4x4()
-        self.inputTransformSelector.currentNode().GetMatrixTransformToParent(nudgedMatrix)
-        nudgedMatrix.SetElement(0,3,nudgedMatrix.GetElement(0,3)+nudgeVector[0])
-        nudgedMatrix.SetElement(1,3,nudgedMatrix.GetElement(1,3)+nudgeVector[1])
-        nudgedMatrix.SetElement(2,3,nudgedMatrix.GetElement(2,3)+nudgeVector[2])
-        self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(nudgedMatrix)
+        # nudgedMatrix = vtk.vtkMatrix4x4()
+        # self.inputTransformSelector.currentNode().GetMatrixTransformToParent(nudgedMatrix)
+        # nudgedMatrix.SetElement(0,3,nudgedMatrix.GetElement(0,3)+nudgeVector[0])
+        # nudgedMatrix.SetElement(1,3,nudgedMatrix.GetElement(1,3)+nudgeVector[1])
+        # nudgedMatrix.SetElement(2,3,nudgedMatrix.GetElement(2,3)+nudgeVector[2])
+        # self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(nudgedMatrix)
+
+        combinedMatrix.SetElement(0,3,combinedMatrix.GetElement(0,3)+nudgeVector[0])
+        combinedMatrix.SetElement(1,3,combinedMatrix.GetElement(1,3)+nudgeVector[1])
+        combinedMatrix.SetElement(2,3,combinedMatrix.GetElement(2,3)+nudgeVector[2])
 
         self.nudgeLabel.text = f'Nudge by {nudgeFactor}'
       else:
         self.nudgeLabel.text = ""
+
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
 
     # ------------------------------ ICP with Pose ------------------------------
     elif self.methodComboBox.currentText == "Recorded AI Pose with ICP":
@@ -690,6 +690,15 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         self.nudgeLabel.text = f'ICP performed'
       else:
         self.nudgeLabel.text = ""
+
+    # Calculates scale from centerline for the next step from the current step if there is a centerline
+    if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode():
+      closestRadius = self.calculateClosestCenterlineRadius()
+      #print(closestRadius)
+      if self.stepCount == 1:
+        self.centerlineStartRadius = closestRadius
+      self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
+      self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
 
     self.stepCount = self.stepCount + self.stepSkipBox.value
     self.stepLabel.setText(stepCountString)
@@ -998,3 +1007,17 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         closestPoint = pathPoint
         closestIdx = idx
     return closestPoint, closestIdx
+  
+  def findClosestPointOnLine(self, pathNode, point):
+    path_pd = pathNode.GetPolyData()
+    cellLocator = vtk.vtkCellLocator()
+    cellLocator.SetDataSet(path_pd)
+    cellLocator.BuildLocator()
+
+    closestPoint = [0.0, 0.0, 0.0]  # To store the coordinates of the closest point
+    cellId = vtk.mutable(0)  # To store the ID of the cell (line segment) containing the closest point
+    subId = vtk.mutable(0)  # To store the ID of the sub-cell (not used for lines, so it will remain 0)
+    dist2 = vtk.mutable(0.0)  # To store the squared distance from the query point to the closest point
+
+    cellLocator.FindClosestPoint(point, closestPoint, cellId, subId, dist2)
+    return closestPoint
