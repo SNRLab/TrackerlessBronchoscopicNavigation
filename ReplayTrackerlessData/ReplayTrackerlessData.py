@@ -98,7 +98,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.stepModeCollapsibleButton)
     stepModeLayout = qt.QFormLayout(self.stepModeCollapsibleButton)
     self.gtPathBox = qt.QLineEdit("D:/MeghaData/Data/phantom2_07_31_2024/processed_phantom_fullpaths_results/1/new_renamed")
-    self.gtPathBox.setReadOnly(True)
+    self.gtPathBox.setReadOnly(False)
     self.gtPathButton = qt.QPushButton("...")
     self.gtPathButton.clicked.connect(self.select_directory_gt)
     gtPathBoxLayout = qt.QHBoxLayout()
@@ -238,7 +238,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.pointCloudSelector.addEnabled = True
     self.pointCloudSelector.removeEnabled = True
     self.pointCloudSelector.renameEnabled = True
-    self.pointCloudSelector.noneEnabled = False
+    self.pointCloudSelector.noneEnabled = True
     self.pointCloudSelector.showHidden = False
     self.pointCloudSelector.showChildNodeTypes = False
     self.pointCloudSelector.setMRMLScene(slicer.mrmlScene)
@@ -423,12 +423,18 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     resultMatrix = vtk.vtkMatrix4x4()
     if self.inputTransformSelector.currentNode():
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
-    # icpMatrix = vtk.vtkMatrix4x4()
-    # if self.icpTransformSelector.currentNode():
-    #   self.icpTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(icpMatrix)
-    # nudgeMatrix = vtk.vtkMatrix4x4()
-    # if self.nudgeTransformSelector.currentNode():
-    #   self.nudgeTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(nudgeMatrix)
+    
+    # Set the initialization transform based on the first ground truth frame
+    with open(f'{self.gtPathBox.text}/frame_data1.json', 'rb') as f:
+      data = json.load(f)
+      cameraPose = data['camera-pose']
+      
+      matrix = vtk.vtkMatrix4x4()
+      matrix.SetElement(0, 0, cameraPose[0][0]); matrix.SetElement(0, 1, cameraPose[0][1]); matrix.SetElement(0, 2, cameraPose[0][2]); matrix.SetElement(0, 3, cameraPose[0][3])
+      matrix.SetElement(1, 0, cameraPose[1][0]); matrix.SetElement(1, 1, cameraPose[1][1]); matrix.SetElement(1, 2, cameraPose[1][2]); matrix.SetElement(1, 3, cameraPose[1][3])
+      matrix.SetElement(2, 0, cameraPose[2][0]); matrix.SetElement(2, 1, cameraPose[2][1]); matrix.SetElement(2, 2, cameraPose[2][2]); matrix.SetElement(2, 3, cameraPose[2][3])
+      matrix.SetElement(3, 0, cameraPose[3][0]); matrix.SetElement(3, 1, cameraPose[3][1]); matrix.SetElement(3, 2, cameraPose[3][2]); matrix.SetElement(3, 3, cameraPose[3][3])
+      self.inputTransformSelector.currentNode().GetParentTransformNode().SetAndObserveMatrixTransformToParent(matrix)
   
   def onMaskSelection(self, index):
     if index == 1:
@@ -457,12 +463,13 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       prefix = "mask_"
       suffix = ".jpeg"
       maskFilename = ""
-      for filename in os.listdir(self.gtPathBox.text):
-        if filename.startswith(prefix) and filename.endswith(suffix):
-          base_name = filename.split(".")[0]
-          number_str = base_name.split("_")[1]
-          if number_str == stepCountString:
-            maskFilename = filename
+      maskFilename = f'{prefix}{stepCountString.zfill(10)}{suffix}'
+      # for filename in os.listdir(self.gtPathBox.text):
+        # if filename.startswith(prefix) and filename.endswith(suffix):
+          # base_name = filename.split(".")[0]
+          # number_str = base_name.split("_")[1]
+          # if number_str == stepCountString:
+            # maskFilename = filename
       maskImage = np.load(f'{self.gtPathBox.text}/{maskFilename}')[0][0]
     if self.imageSelector.currentNode():
       self.depthMapToPointCloud(depthMap, slicer.util.arrayFromVolume(self.imageSelector.currentNode())[self.stepCount], maskImage)
@@ -476,20 +483,25 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     red = layoutManager.sliceWidget('Red')
     redLogic = red.sliceLogic()
     #redLogic.SetSliceOffset(self.stepCount//self.stepSkipBox.value - 1)
-    redLogic.SetSliceOffset(self.stepCount - 1)
+    redLogic.SetSliceOffset(self.stepCount)
 
     # RGB
     green = layoutManager.sliceWidget('Green')
     greenLogic = green.sliceLogic()
-    greenLogic.SetSliceOffset(self.stepCount - 1)
+    greenLogic.SetSliceOffset(self.stepCount)
 
   def onStepImage(self):
     stepCountString = str(self.stepCount)
     maskImage = None
-
+    
+    self.stepCount = self.stepCount + self.stepSkipBox.value
+    
     if self.stepCount > len(self.translations_pred['a']):
       self.stepTimerButton.setChecked(False)
       self.onStepTimer()
+      return
+      
+    self.stepLabel.setText(str(self.stepCount))
       
     # ------------------------------ Ground Truth ------------------------------
     if self.methodComboBox.currentText == "Ground Truth":
@@ -502,11 +514,12 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       # Start Load Ground Truth:
       prefix = "frame_data"
       frameDataFilename = ""
-      for filename in os.listdir(self.gtPathBox.text):
-        if filename.startswith(prefix):
-          stripped_filename = re.sub('^' + prefix, '', filename).lstrip('0').split('.')[0]
-          if stripped_filename == stepCountString:
-            frameDataFilename = filename
+      frameDataFilename = f'frame_data{stepCountString}.json'
+      # for filename in os.listdir(self.gtPathBox.text):
+        # if filename.startswith(prefix):
+          # stripped_filename = re.sub('^' + prefix, '', filename).lstrip('0').split('.')[0]
+          # if stripped_filename == str(self.stepCount+1):
+            # frameDataFilename = filename
 
       # Grab pose data and use it
       with open(f'{self.gtPathBox.text}/{frameDataFilename}', 'rb') as f:
@@ -518,6 +531,13 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         matrix.SetElement(1, 0, cameraPose[1][0]); matrix.SetElement(1, 1, cameraPose[1][1]); matrix.SetElement(1, 2, cameraPose[1][2]); matrix.SetElement(1, 3, cameraPose[1][3])
         matrix.SetElement(2, 0, cameraPose[2][0]); matrix.SetElement(2, 1, cameraPose[2][1]); matrix.SetElement(2, 2, cameraPose[2][2]); matrix.SetElement(2, 3, cameraPose[2][3])
         matrix.SetElement(3, 0, cameraPose[3][0]); matrix.SetElement(3, 1, cameraPose[3][1]); matrix.SetElement(3, 2, cameraPose[3][2]); matrix.SetElement(3, 3, cameraPose[3][3])
+
+        # Apply inverse of the initialization transform
+        inverseParentMatrix = vtk.vtkMatrix4x4()
+        self.inputTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToParent(inverseParentMatrix)
+        inverseParentMatrix.Invert()
+        matrix.Multiply4x4(inverseParentMatrix, matrix, matrix)
+        
         self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(matrix)
       
     # ------------------------------ None ------------------------------
@@ -567,8 +587,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale, rotatationScale)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      predMatrix.SetElement(1,3,-predMatrix.GetElement(1,3))
+      predMatrix.SetElement(0,3,-predMatrix.GetElement(0,3))
+      predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
       predMatrix.SetElement(2,3,-predMatrix.GetElement(2,3))
 
       combinedMatrix = vtk.vtkMatrix4x4()
@@ -594,8 +614,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale, rotatationScale)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      predMatrix.SetElement(1,3,-predMatrix.GetElement(1,3))
+      predMatrix.SetElement(0,3,-predMatrix.GetElement(0,3))
+      predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
       predMatrix.SetElement(2,3,-predMatrix.GetElement(2,3))
 
       combinedMatrix = vtk.vtkMatrix4x4()
@@ -658,8 +678,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale, rotatationScale)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      predMatrix.SetElement(1,3,-predMatrix.GetElement(1,3))
+      predMatrix.SetElement(0,3,-predMatrix.GetElement(0,3))
+      predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
       predMatrix.SetElement(2,3,-predMatrix.GetElement(2,3))
 
       combinedMatrix = vtk.vtkMatrix4x4()
@@ -696,14 +716,11 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode():
       closestRadius = self.calculateClosestCenterlineRadius()
       #print(closestRadius)
-      if self.stepCount == 1:
+      if self.stepCount <= 2:
         self.centerlineStartRadius = closestRadius
       self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
       self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
-
-    self.stepCount = self.stepCount + self.stepSkipBox.value
-    self.stepLabel.setText(stepCountString)
-
+    
   def get_transform(self, euler, translation, scale, rotationScale):
     eulerValues = [angle * rotationScale for angle in euler.cpu().numpy().squeeze()]
     # the output of the network is in radians
