@@ -100,7 +100,7 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     self.cameraTransformSelector = slicer.qMRMLNodeComboBox()
     self.cameraTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
     self.cameraTransformSelector.selectNodeUponCreation = False
-    self.cameraTransformSelector.noneEnabled = False
+    self.cameraTransformSelector.noneEnabled = True
     self.cameraTransformSelector.addEnabled = True
     self.cameraTransformSelector.removeEnabled = True
     self.cameraTransformSelector.setMRMLScene(slicer.mrmlScene)
@@ -122,25 +122,34 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     self.undistortImageSelector.addEnabled = True
     self.undistortImageSelector.showHidden = False
     self.undistortImageSelector.setMRMLScene( slicer.mrmlScene )
-    controlLayout.addRow("Undistortd Node:", self.undistortImageSelector)
+    controlLayout.addRow("Undistorted Node:", self.undistortImageSelector)
     
-    self.cameraRollTransformSelector = slicer.qMRMLNodeComboBox()
-    self.cameraRollTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
-    self.cameraRollTransformSelector.selectNodeUponCreation = False
-    self.cameraRollTransformSelector.noneEnabled = False
-    self.cameraRollTransformSelector.addEnabled = True
-    self.cameraRollTransformSelector.removeEnabled = True
-    self.cameraRollTransformSelector.setMRMLScene(slicer.mrmlScene)
-    controlLayout.addRow("Camera Roll Transform: ", self.cameraRollTransformSelector)
+    # self.cameraRollTransformSelector = slicer.qMRMLNodeComboBox()
+    # self.cameraRollTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+    # self.cameraRollTransformSelector.selectNodeUponCreation = False
+    # self.cameraRollTransformSelector.noneEnabled = True
+    # self.cameraRollTransformSelector.addEnabled = True
+    # self.cameraRollTransformSelector.removeEnabled = True
+    # self.cameraRollTransformSelector.setMRMLScene(slicer.mrmlScene)
+    # controlLayout.addRow("Camera Roll Transform: ", self.cameraRollTransformSelector)
 
     self.outputImageSelector = slicer.qMRMLNodeComboBox()
     self.outputImageSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
     self.outputImageSelector.selectNodeUponCreation = False
-    self.outputImageSelector.noneEnabled = False
+    self.outputImageSelector.noneEnabled = True
     self.outputImageSelector.addEnabled = True
     self.outputImageSelector.removeEnabled = True
     self.outputImageSelector.setMRMLScene(slicer.mrmlScene)
-    controlLayout.addRow("Depth Map: ", self.outputImageSelector)
+    controlLayout.addRow("Depth Map Output: ", self.outputImageSelector)
+    
+    self.rgbOutputImageSelector = slicer.qMRMLNodeComboBox()
+    self.rgbOutputImageSelector.nodeTypes = ["vtkMRMLVectorVolumeNode"]
+    self.rgbOutputImageSelector.selectNodeUponCreation = False
+    self.rgbOutputImageSelector.noneEnabled = True
+    self.rgbOutputImageSelector.addEnabled = True
+    self.rgbOutputImageSelector.removeEnabled = True
+    self.rgbOutputImageSelector.setMRMLScene(slicer.mrmlScene)
+    controlLayout.addRow("RGB Output: ", self.rgbOutputImageSelector)
 
     self.layout.addStretch(1)
 
@@ -278,9 +287,9 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
     self.setCameraRoll()
     
     # Undistort
-    self.undistortImage()
+    if self.undistortImageSelector.currentNode():
+        self.undistortImage()
     
-    outputNode = self.outputImageSelector.currentNode()
     renderWindow = None
     layoutManager = slicer.app.layoutManager()
     for viewIndex in range(layoutManager.threeDViewCount):
@@ -291,58 +300,101 @@ class DepthMapGenerationWidget(ScriptedLoadableModuleWidget):
         break
     
     if renderWindow:
-      windowToImageFilter = vtk.vtkWindowToImageFilter()
-      windowToImageFilter.SetInput(renderWindow)
-      windowToImageFilter.SetInputBufferTypeToZBuffer()
-      windowToImageFilter.Update()
-      depth_map = windowToImageFilter.GetOutput()
-
-      dims = depth_map.GetDimensions()
-      center_square_dim = dims[1]
-
-      # Calculate the extents of the center square
-      x_min = dims[0] // 2 - center_square_dim // 2
-      x_max = dims[0] // 2 + center_square_dim // 2
-      y_min = dims[1] // 2 - center_square_dim // 2
-      y_max = dims[1] // 2 + center_square_dim // 2
-
-      extract_voi = vtk.vtkExtractVOI()
-      extract_voi.SetInputData(depth_map)
-      extract_voi.SetVOI(x_min, x_max, y_min, y_max, 0, 0)
-      extract_voi.Update()
-
-      # Get the output of vtkExtractVOI
-      cropped_image = extract_voi.GetOutput()
-
-      flip_filter = vtk.vtkImageFlip()
-      flip_filter.SetInputData(cropped_image)
-      # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
-      flip_filter.SetFilteredAxis(0)  # Flip along y-axis
-      flip_filter.Update()
+      if self.outputImageSelector.currentNode():
+        outputNode = self.outputImageSelector.currentNode()
         
-      resize = vtk.vtkImageResize()
-      resize.SetResizeMethodToOutputDimensions()
-      resize.SetInputData(flip_filter.GetOutput())
-      resize.SetOutputDimensions(200, 200, 1)
-      resize.Update()
+        windowToImageFilter = vtk.vtkWindowToImageFilter()
+        windowToImageFilter.SetInput(renderWindow)
+        windowToImageFilter.SetInputBufferTypeToZBuffer()
+        windowToImageFilter.Update()
+        depth_map = windowToImageFilter.GetOutput()
 
-      # Convert to Linear
-      vtkImage = resize.GetOutput()
-      vtk_data_array = vtkImage.GetPointData().GetScalars()
-      numpy_array = vtk.util.numpy_support.vtk_to_numpy(vtk_data_array)
-      zNear = camera.GetClippingRange()[0]
-      zFar = camera.GetClippingRange()[1]
-      numpy_array = self.screen_to_eye_depth_perspective(numpy_array, zNear, zFar)
-      vtk_data_array = vtk.util.numpy_support.numpy_to_vtk(numpy_array)
-      vtkImage.GetPointData().SetScalars(vtk_data_array)
+        dims = depth_map.GetDimensions()
+        center_square_dim = dims[1]
 
-      change = vtk.vtkImageChangeInformation()
-      change.SetInputConnection(resize.GetOutputPort())
-      change.SetOutputSpacing(cropped_image.GetSpacing())
-      change.Update()
+        # Calculate the extents of the center square
+        x_min = dims[0] // 2 - center_square_dim // 2
+        x_max = dims[0] // 2 + center_square_dim // 2
+        y_min = dims[1] // 2 - center_square_dim // 2
+        y_max = dims[1] // 2 + center_square_dim // 2
+    
+        extract_voi = vtk.vtkExtractVOI()
+        extract_voi.SetInputData(depth_map)
+        extract_voi.SetVOI(x_min, x_max, y_min, y_max, 0, 0)
+        extract_voi.Update()
+    
+        # Get the output of vtkExtractVOI
+        cropped_image = extract_voi.GetOutput()
+    
+        flip_filter = vtk.vtkImageFlip()
+        flip_filter.SetInputData(cropped_image)
+        # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
+        flip_filter.SetFilteredAxis(0)  # Flip along y-axis
+        flip_filter.Update()
+            
+        resize = vtk.vtkImageResize()
+        resize.SetResizeMethodToOutputDimensions()
+        resize.SetInputData(flip_filter.GetOutput())
+        resize.SetOutputDimensions(200, 200, 1)
+        resize.Update()
+    
+        # Convert to Linear
+        vtkImage = resize.GetOutput()
+        vtk_data_array = vtkImage.GetPointData().GetScalars()
+        numpy_array = vtk.util.numpy_support.vtk_to_numpy(vtk_data_array)
+        zNear = camera.GetClippingRange()[0]
+        zFar = camera.GetClippingRange()[1]
+        numpy_array = self.screen_to_eye_depth_perspective(numpy_array, zNear, zFar)
+        vtk_data_array = vtk.util.numpy_support.numpy_to_vtk(numpy_array)
+        vtkImage.GetPointData().SetScalars(vtk_data_array)
+
+        change = vtk.vtkImageChangeInformation()
+        change.SetInputConnection(resize.GetOutputPort())
+        change.SetOutputSpacing(cropped_image.GetSpacing())
+        change.Update()
       
-      outputNode.SetAndObserveImageData(change.GetOutput())
-      outputNode.SetIJKToRASDirections(1,0,0,0,1,0,0,0,1)
+        outputNode.SetAndObserveImageData(change.GetOutput())
+        outputNode.SetIJKToRASDirections(1,0,0,0,1,0,0,0,1)
+        
+      if self.rgbOutputImageSelector.currentNode():
+        rgbOutputNode = self.rgbOutputImageSelector.currentNode()
+      
+        windowToImageFilter = vtk.vtkWindowToImageFilter()
+        windowToImageFilter.SetInput(renderWindow)
+        windowToImageFilter.Update()
+        rgb_map = windowToImageFilter.GetOutput()
+
+        dims = rgb_map.GetDimensions()
+        center_square_dim = dims[1]
+
+        # Calculate the extents of the center square
+        x_min = dims[0] // 2 - center_square_dim // 2
+        x_max = dims[0] // 2 + center_square_dim // 2
+        y_min = dims[1] // 2 - center_square_dim // 2
+        y_max = dims[1] // 2 + center_square_dim // 2
+    
+        extract_voi = vtk.vtkExtractVOI()
+        extract_voi.SetInputData(rgb_map)
+        extract_voi.SetVOI(x_min, x_max, y_min, y_max, 0, 0)
+        extract_voi.Update()
+    
+        # Get the output of vtkExtractVOI
+        cropped_image = extract_voi.GetOutput()
+    
+        flip_filter = vtk.vtkImageFlip()
+        flip_filter.SetInputData(cropped_image)
+        # Set the flip axis (0 for x-axis, 1 for y-axis, 2 for z-axis)
+        flip_filter.SetFilteredAxis(0)  # Flip along y-axis
+        flip_filter.Update()
+            
+        resize = vtk.vtkImageResize()
+        resize.SetResizeMethodToOutputDimensions()
+        resize.SetInputData(flip_filter.GetOutput())
+        resize.SetOutputDimensions(200, 200, 1)
+        resize.Update()
+      
+        rgbOutputNode.SetAndObserveImageData(resize.GetOutput())
+        rgbOutputNode.SetIJKToRASDirections(1,0,0,0,1,0,0,0,1)        
 
 class DepthMapGenerationLogic:
   def __init__(self):

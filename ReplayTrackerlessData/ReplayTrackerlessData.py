@@ -153,7 +153,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepSkipBox.setSingleStep(1)
     self.stepSkipBox.setMaximum(100)
     self.stepSkipBox.setMinimum(1)
-    self.stepSkipBox.value = 3
+    self.stepSkipBox.value = 1
     stepModeLayout.addRow("Step skip: ", self.stepSkipBox)
 
     self.stepLabel = qt.QLabel("1")
@@ -195,7 +195,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeInterval.setSingleStep(1)
     self.nudgeInterval.setMaximum(100)
     self.nudgeInterval.setMinimum(1)
-    self.nudgeInterval.value = 3
+    self.nudgeInterval.value = 1
     stepModeLayout.addRow("Nudge Interval: ", self.nudgeInterval)
 
     self.nudgeFactorWidget = ctk.ctkSliderWidget()
@@ -203,7 +203,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeFactorWidget.minimum = 0.00
     self.nudgeFactorWidget.maximum = 100.00
     self.nudgeFactorWidget.singleStep = 0.01
-    self.nudgeFactorWidget.value = 0.40
+    self.nudgeFactorWidget.value = 0.2
     stepModeLayout.addRow("Nudge Factor:", self.nudgeFactorWidget)
 
     # self.nudgeTransformSelector = slicer.qMRMLNodeComboBox()
@@ -439,9 +439,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       self.borderCutBox.setEnabled(False)
 
   def onLoadPred(self):
-    self.translations_pred = np.load(f'{self.gtPathBox.text}/translation.npz')
-    self.euler_angle_pred = np.load(f'{self.gtPathBox.text}/eulerangle.npz')
-    self.pose_pred = np.load(f'{self.gtPathBox.text}/pose_prediction.npz')
+    self.translations_pred = np.load(f'{self.gtPathBox.text}/translation_freq_1_001.npz')
+    self.euler_angle_pred = np.load(f'{self.gtPathBox.text}/eulerangle_freq_1_001.npz')
+    self.pose_pred = np.load(f'{self.gtPathBox.text}/pose_prediction_freq_1.npz')
 
   def createPointCloud(self, stepCountString, maskImage):
     suffix = "_depth.npy"
@@ -475,7 +475,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # Depth Map
     red = layoutManager.sliceWidget('Red')
     redLogic = red.sliceLogic()
-    redLogic.SetSliceOffset(self.stepCount//self.stepSkipBox.value - 1)
+    #redLogic.SetSliceOffset(self.stepCount//self.stepSkipBox.value - 1)
+    redLogic.SetSliceOffset(self.stepCount - 1)
 
     # RGB
     green = layoutManager.sliceWidget('Green')
