@@ -120,6 +120,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.methodComboBox.addItem('Recorded AI Pose')
     self.methodComboBox.addItem('Recorded AI Pose with Nudge')
     self.methodComboBox.addItem('Recorded AI Pose with ICP')
+    self.methodComboBox.addItem('cGAN with ICP')
     self.methodComboBox.addItem('Ground Truth')
     self.methodComboBox.addItem('None')
     self.methodComboBox.setCurrentIndex(1)
@@ -458,8 +459,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         if stripped_filename == stepCountString:
           depthMapFilename = filename
     depthMap = np.load(f'{self.gtPathBox.text}/{depthMapFilename}')[0][0]
-
-    if self.maskSelectionComboBox.currentIndex == 1:
+    maskImage = None
+    if self.maskSelectionComboBox.currentIndex == 0:
       prefix = "mask_"
       suffix = ".jpeg"
       maskFilename = ""
@@ -709,8 +710,30 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedIcpMatrix)
 
         self.nudgeLabel.text = f'ICP performed'
-      else:
-        self.nudgeLabel.text = ""
+    # ------------------------------ ICP with Pose ------------------------------
+    elif self.methodComboBox.currentText == "cGAN with ICP":
+      if self.pointCloudSelector.currentNode():
+        self.createPointCloud(stepCountString, maskImage)
+          
+      # Display image by moving slice offset
+      self.adjustSliceOffset()
+
+      # Start AI Pose:
+      scale = self.scaleSliderWidget.value
+      rotatationScale = self.rotationScaleSliderWidget.value
+
+      previousMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
+
+      # Start ICP:
+      icpMatrix = self.calculateICPTransform()   
+
+      combinedIcpMatrix = vtk.vtkMatrix4x4()
+      combinedIcpMatrix.Multiply4x4(icpMatrix, previousMatrix, combinedIcpMatrix)
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedIcpMatrix)
+
+      self.nudgeLabel.text = f'ICP performed'        
+
 
     # Calculates scale from centerline for the next step from the current step if there is a centerline
     if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode():
@@ -986,7 +1009,11 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     icp = vtk.vtkIterativeClosestPointTransform()
     icp.SetSource(movingPolyData)
     icp.SetTarget(fixedPolyData)
-    icp.GetLandmarkTransform().SetModeToSimilarity()
+    #icp.GetLandmarkTransform().SetModeToSimilarity()
+    if self.stepCount == 1+self.stepSkipBox.value:
+      icp.GetLandmarkTransform().SetModeToSimilarity()
+    else:
+      icp.GetLandmarkTransform().SetModeToRigidBody()
     icp.SetMeanDistanceModeToAbsoluteValue()
     icp.SetMaximumNumberOfIterations(int(self.icpIterationsSlider.value))
     icp.SetMaximumMeanDistance(self.icpMaxDistanceSlider.value)
