@@ -13,6 +13,7 @@ from PIL import Image
 from Resources import layers
 import re
 import json
+import cv2
 from scipy.spatial.transform import Rotation as R
 
 class ReplayTrackerlessData(ScriptedLoadableModule):
@@ -51,17 +52,20 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepTimer.timeout.connect(self.onStepImage)
     self.centerlineScaleFactor = 1.0
     self.centerlineStartRadius = 1.0
+    self.numberOfFrames = 0
 
   def cleanup(self):
     self.stepTimer.stop()
     self.centerlineScaleFactor = 1.0
     self.centerlineStartRadius = 1.0
+    self.numberOfFrames = 0
     self.onResetStepCount()
 
   def onReload(self,moduleName="ReplayTrackerlessData"):
     self.stepTimer.stop()
     self.centerlineScaleFactor = 1.0
     self.centerlineStartRadius = 1.0
+    self.numberOfFrames = 0
     self.onResetStepCount()
     globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)    
 
@@ -133,7 +137,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.methodComboBox.addItem('cGAN with ICP')
     self.methodComboBox.addItem('Ground Truth')
     self.methodComboBox.addItem('None')
-    self.methodComboBox.setCurrentIndex(1)
+    self.methodComboBox.setCurrentIndex(0)
     stepModeLayout.addRow('Registration Method:', self.methodComboBox)
 
     # self.gtCheckBox = qt.QCheckBox("Use Ground Truth Data")
@@ -146,7 +150,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
     self.autoInputsButton = qt.QPushButton("Auto Set Input")
     stepModeLayout.addRow(self.autoInputsButton)
-    self.autoInputsButton.connect('clicked()', self.onAutoInputs)    
+    self.autoInputsButton.connect('clicked()', self.onAutoInputs)
 
     self.loadPredButton = qt.QPushButton("Load Predictions")
     stepModeLayout.addRow(self.loadPredButton)
@@ -164,7 +168,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepSkipBox.setSingleStep(1)
     self.stepSkipBox.setMaximum(100)
     self.stepSkipBox.setMinimum(1)
-    self.stepSkipBox.value = 1
+    self.stepSkipBox.value = 4
     stepModeLayout.addRow("Step skip: ", self.stepSkipBox)
 
     self.stepLabel = qt.QLabel("1")
@@ -183,7 +187,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepFPSBox.setMaximum(144)
     self.stepFPSBox.setMinimum(1)
     self.stepFPSBox.setSuffix(" FPS")
-    self.stepFPSBox.value = 10
+    self.stepFPSBox.value = 40
     stepModeLayout.addRow(self.stepFPSBox)
 
     self.scaleSliderWidget = ctk.ctkSliderWidget()
@@ -191,22 +195,33 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.scaleSliderWidget.minimum = 0.00
     self.scaleSliderWidget.maximum = 1000.00
     self.scaleSliderWidget.singleStep = 0.01
-    self.scaleSliderWidget.value = 18.00
+    self.scaleSliderWidget.value = 24.00
     stepModeLayout.addRow("Scale Factor:", self.scaleSliderWidget)
+
+    self.flipPredictionCheckbox = qt.QCheckBox("Flip Prediction")
+    self.flipPredictionCheckbox.setChecked(False)
+    stepModeLayout.addRow(self.flipPredictionCheckbox)
+
+    self.stepStartOffsetBox = qt.QSpinBox()
+    self.stepStartOffsetBox.setSingleStep(1)
+    self.stepStartOffsetBox.setMaximum(10000)
+    self.stepStartOffsetBox.setMinimum(1)
+    self.stepStartOffsetBox.value = 1
+    stepModeLayout.addRow("Step Start:", self.stepStartOffsetBox)
 
     self.rotationScaleSliderWidget = ctk.ctkSliderWidget()
     self.rotationScaleSliderWidget.setDecimals(2)
     self.rotationScaleSliderWidget.minimum = 0.00
     self.rotationScaleSliderWidget.maximum = 100.00
     self.rotationScaleSliderWidget.singleStep = 0.01
-    self.rotationScaleSliderWidget.value = 2.00
+    self.rotationScaleSliderWidget.value = 4.00
     stepModeLayout.addRow("Rotation Scale Factor:", self.rotationScaleSliderWidget)
 
     self.nudgeInterval = qt.QSpinBox()
     self.nudgeInterval.setSingleStep(1)
     self.nudgeInterval.setMaximum(100)
     self.nudgeInterval.setMinimum(1)
-    self.nudgeInterval.value = 1
+    self.nudgeInterval.value = 4
     stepModeLayout.addRow("Nudge Interval: ", self.nudgeInterval)
 
     self.nudgeFactorWidget = ctk.ctkSliderWidget()
@@ -214,7 +229,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeFactorWidget.minimum = 0.00
     self.nudgeFactorWidget.maximum = 100.00
     self.nudgeFactorWidget.singleStep = 0.01
-    self.nudgeFactorWidget.value = 0.2
+    self.nudgeFactorWidget.value = 0.3
     stepModeLayout.addRow("Nudge Factor:", self.nudgeFactorWidget)
 
     # self.nudgeTransformSelector = slicer.qMRMLNodeComboBox()
@@ -383,18 +398,29 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.icpMaxDistanceSlider.value = 0.001
     icpLayout.addRow("Maximum of Distance:", self.icpMaxDistanceSlider)
 
+    self.initialICPButton = qt.QPushButton("Initialization ICP")
+    icpLayout.addRow(self.initialICPButton)
+    self.initialICPButton.connect('clicked()', self.onInitializationICP)
+
+    self.initializationICPTransformSelector = slicer.qMRMLNodeComboBox()
+    self.initializationICPTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+    self.initializationICPTransformSelector.selectNodeUponCreation = False
+    self.initializationICPTransformSelector.noneEnabled = True
+    self.initializationICPTransformSelector.addEnabled = True
+    self.initializationICPTransformSelector.removeEnabled = True
+    self.initializationICPTransformSelector.setMRMLScene(slicer.mrmlScene)
+    icpLayout.addRow("Initialization ICP Transform: ", self.initializationICPTransformSelector)
+
     # Add vertical spacer
     self.layout.addStretch(1)
 
   def onAutoInputs(self):
     #self.imageSelector.setCurrentNode(slicer.util.getNode('0000000001'))
     self.inputTransformSelector.setCurrentNode(slicer.util.getNode('Pose'))
-    self.pointCloudSelector.setCurrentNode(slicer.util.getNode('PointCloud'))
+    #self.pointCloudSelector.setCurrentNode(slicer.util.getNode('PointCloud'))
     self.centerlineSelector.setCurrentNode(slicer.util.getNode('CenterlineModel'))
     self.cameraAirwayPositionSelector.setCurrentNode(slicer.util.getNode('AirwayPosition'))
     self.baseModelSelector.setCurrentNode(slicer.util.getNode('airway'))
-    # self.icpTransformSelector.setCurrentNode(slicer.util.getNode('ICPTransform'))
-    # self.nudgeTransformSelector.setCurrentNode(slicer.util.getNode('NudgeTransform'))
 
   def select_directory(self):
     directory = qt.QFileDialog.getExistingDirectory(self.parent, "Select Directory")
@@ -420,8 +446,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       self.stepFPSBox.enabled = True
 
   def onResetStepCount(self):
-    self.stepCount = 1
-    self.stepLabel.setText('1')
+    self.stepCount = self.stepStartOffsetBox.value
+    self.stepLabel.setText(f'{self.stepStartOffsetBox.value}')
 
     self.centerlineScaleFactor = 1.0
 
@@ -433,15 +459,41 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     green = layoutManager.sliceWidget('Green')
     greenLogic = green.sliceLogic()
     greenLogic.SetSliceOffset(0)
+    
+    self.numberOfFrames = self.count_GT_files(self.gtPathBox.text)
 
     self.nudgeLabel.text = ""
-    
+    scale = self.scaleSliderWidget.value
+
     resultMatrix = vtk.vtkMatrix4x4()
-    if self.inputTransformSelector.currentNode():
-      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
+    if self.methodComboBox.currentText == "Ground Truth" or self.methodComboBox.currentText == "cGAN with ICP":
+      correctionNode = slicer.util.getNode("Correction")
+      inverseCorrectionNode = slicer.util.getNode("InverseCorrection")
+      correctionMatrix = vtk.vtkMatrix4x4()
+      inverseCorrectionMatrix = vtk.vtkMatrix4x4()
+      correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
+      inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
+      correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
+      inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
+    else:
+      correctionNode = slicer.util.getNode("Correction")
+      inverseCorrectionNode = slicer.util.getNode("InverseCorrection")
+      correctionMatrix = vtk.vtkMatrix4x4()
+      inverseCorrectionMatrix = vtk.vtkMatrix4x4()
+      if self.flipPredictionCheckbox.isChecked():
+        correctionMatrix.SetElement(0, 0, -1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, -1)
+        inverseCorrectionMatrix.SetElement(0, 0, -1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+      else:
+        correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, -1); correctionMatrix.SetElement(2, 2, -1)
+        inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, -1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+      correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
+      inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
+
+      #resultMatrix.SetElement(0, 0, scale); resultMatrix.SetElement(1, 1, scale); resultMatrix.SetElement(2, 2, scale)
     
+    self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
     # Set the initialization transform based on the first ground truth frame
-    with open(f'{self.gtPathBox.text}/frame_data1.json', 'rb') as f:
+    with open(f'{self.gtPathBox.text}/frame_data{str(self.stepCount)}.json', 'rb') as f:
       data = json.load(f)
       cameraPose = data['camera-pose']
       
@@ -450,7 +502,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       matrix.SetElement(1, 0, cameraPose[1][0]); matrix.SetElement(1, 1, cameraPose[1][1]); matrix.SetElement(1, 2, cameraPose[1][2]); matrix.SetElement(1, 3, cameraPose[1][3])
       matrix.SetElement(2, 0, cameraPose[2][0]); matrix.SetElement(2, 1, cameraPose[2][1]); matrix.SetElement(2, 2, cameraPose[2][2]); matrix.SetElement(2, 3, cameraPose[2][3])
       matrix.SetElement(3, 0, cameraPose[3][0]); matrix.SetElement(3, 1, cameraPose[3][1]); matrix.SetElement(3, 2, cameraPose[3][2]); matrix.SetElement(3, 3, cameraPose[3][3])
-      self.inputTransformSelector.currentNode().GetParentTransformNode().GetParentTransformNode().SetAndObserveMatrixTransformToParent(matrix)
+      startTransformNode = slicer.util.getNode("Start")
+      #self.inputTransformSelector.currentNode().GetParentTransformNode().GetParentTransformNode().SetAndObserveMatrixTransformToParent(matrix)
+      startTransformNode.SetAndObserveMatrixTransformToParent(matrix)
   
   def onMaskSelection(self, index):
     if index == 1:
@@ -461,9 +515,23 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       self.borderCutBox.setEnabled(False)
 
   def onLoadPred(self):
-    self.translations_pred = np.load(f'{self.pathBox.text}/translation_1e-06.npz')
-    self.euler_angle_pred = np.load(f'{self.pathBox.text}/eulerangle_1e-06.npz')
-    self.pose_pred = np.load(f'{self.pathBox.text}/pose_prediction_1e-06.npz')
+    translationsFilename = ""
+    eulerFilename = ""
+    poseFilename = ""
+    for filename in os.listdir(self.pathBox.text):
+      if filename.startswith('translation') and filename.endswith('.npz'):
+        translationsFilename = filename
+      elif filename.startswith('euler') and filename.endswith('.npz'):
+        eulerFilename = filename
+      elif filename.startswith('pose') and filename.endswith('.npz'):
+        poseFilename = filename
+    self.translations_pred = np.load(f'{self.pathBox.text}/{translationsFilename}')
+    print(f'Loaded translations; {self.translations_pred["a"].shape}')
+    self.euler_angle_pred = np.load(f'{self.pathBox.text}/{eulerFilename}')
+    print(f'Loaded angles: {self.euler_angle_pred["a"].shape}')
+    self.pose_pred = np.load(f'{self.pathBox.text}/{poseFilename}')
+    print(f'Loaded poses: {self.pose_pred["a"].shape}')
+
 
   def createPointCloud(self, stepCountString, maskImage):
     suffix = "_depth.npy"
@@ -481,7 +549,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       maskFilename = ""
       maskFilename = f'{prefix}{stepCountString.zfill(10)}{suffix}'
 
-      maskImage = np.load(f'{self.pathBox.text}/{maskFilename}')[0][0]
+      #maskImage = np.load(f'{self.pathBox.text}/{maskFilename}')[0][0]
+      maskImage = cv2.imread(f'{self.pathBox.text}/{maskFilename}')
+      maskImage = cv2.cvtColor(maskImage, cv2.COLOR_BGR2GRAY)
     if self.imageSelector.currentNode():
       self.depthMapToPointCloud(depthMap, slicer.util.arrayFromVolume(self.imageSelector.currentNode())[self.stepCount], maskImage)
     else:
@@ -494,20 +564,28 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     red = layoutManager.sliceWidget('Red')
     redLogic = red.sliceLogic()
     #redLogic.SetSliceOffset(self.stepCount//self.stepSkipBox.value - 1)
-    redLogic.SetSliceOffset(self.stepCount)
+    redLogic.SetSliceOffset(self.stepCount-1)
 
     # RGB
     green = layoutManager.sliceWidget('Green')
     greenLogic = green.sliceLogic()
-    greenLogic.SetSliceOffset(self.stepCount)
-
+    greenLogic.SetSliceOffset(self.stepCount//self.stepSkipBox.value - 1)
+    #greenLogic.SetSliceOffset(self.stepCount-1)
+  
+  def count_GT_files(self, directory):
+    count = 0
+    for filename in os.listdir(directory):
+      if filename.startswith("frame_data") and filename.endswith(".json"):
+        count += 1
+    return count
+  
   def onStepImage(self):
-    stepCountString = str(self.stepCount)
     maskImage = None
-    
     self.stepCount = self.stepCount + self.stepSkipBox.value
+    stepCountString = str(self.stepCount)
     
-    if self.stepCount > len(self.translations_pred['a']):
+    #if self.stepCount > len(self.translations_pred['a']):
+    if self.stepCount+self.stepSkipBox.value >= self.numberOfFrames:
       self.stepTimerButton.setChecked(False)
       self.onStepTimer()
       return
@@ -540,7 +618,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
         # Apply inverse of the initialization transform
         inverseParentMatrix = vtk.vtkMatrix4x4()
-        self.inputTransformSelector.currentNode().GetParentTransformNode().GetParentTransformNode().GetMatrixTransformToParent(inverseParentMatrix)
+        #self.inputTransformSelector.currentNode().GetParentTransformNode().GetParentTransformNode().GetMatrixTransformToParent(inverseParentMatrix)
+        self.inputTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToWorld(inverseParentMatrix)
         inverseParentMatrix.Invert()
         matrix.Multiply4x4(inverseParentMatrix, matrix, matrix)
         
@@ -585,12 +664,17 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       # Start AI Pose:
       scale = self.scaleSliderWidget.value
-      rotatationScale = self.rotationScaleSliderWidget.value
+      rotationScale = self.rotationScaleSliderWidget.value
 
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
+      previousNpMatrix = self.vtk_to_numpy_matrix(previousMatrix) / scale
+      step = ((self.stepCount-1-self.stepSkipBox.value) // self.stepSkipBox.value)+1
+      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
-      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale, rotatationScale)
+      #combinedNpMatrix = np.matmul(previousNpMatrix, pred_pose)
+      #combinedNpMatrix = combinedNpMatrix * scale
+      #combinedMatrix = self.numpy_to_vtk_matrix(combinedNpMatrix)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
       predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
@@ -612,17 +696,17 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       # Start AI Pose:
       scale = self.scaleSliderWidget.value
-      rotatationScale = self.rotationScaleSliderWidget.value
+      rotationScale = self.rotationScaleSliderWidget.value
 
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
-
-      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale, rotatationScale)
+      step = ((self.stepCount-1-self.stepSkipBox.value) // self.stepSkipBox.value)+1
+      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
-      predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
+      # predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
+      # predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
+      # predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
 
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
@@ -676,17 +760,17 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       # Start AI Pose:
       scale = self.scaleSliderWidget.value
-      rotatationScale = self.rotationScaleSliderWidget.value
+      rotationScale = self.rotationScaleSliderWidget.value
 
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
-
-      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][self.stepCount-1:self.stepCount, 0]), torch.from_numpy(self.translations_pred['a'][self.stepCount-1:self.stepCount, 0]), scale, rotatationScale)
+      step = ((self.stepCount-1-self.stepSkipBox.value) // self.stepSkipBox.value)+1
+      pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
-      predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
+      # predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
+      # predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
+      # predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
 
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
@@ -725,7 +809,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       # Start AI Pose:
       scale = self.scaleSliderWidget.value
-      rotatationScale = self.rotationScaleSliderWidget.value
+      #rotatationScale = self.rotationScaleSliderWidget.value
 
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
@@ -751,11 +835,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     
   def get_transform(self, euler, translation, scale, rotationScale):
     eulerValues = [angle * rotationScale for angle in euler.cpu().numpy().squeeze()]
+    #eulerValues = [angle for angle in euler.cpu().numpy().squeeze()]
     # the output of the network is in radians
     final_mat = np.eye(4)
     final_mat[:3,:3] = R.from_euler('zyx', eulerValues).as_matrix()
+    #final_mat = final_mat * scale
     T = np.eye(4)
     T[:3,3] = (translation.cpu().numpy().squeeze()) * scale
+    #T[:3,3] = (translation.cpu().numpy().squeeze())
     M = np.matmul(T, final_mat)
     return M
 
@@ -857,9 +944,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     height = len(depthImage)
     width = len(depthImage[0])
 
-    if maskImage:
+    if maskImage.any():
       # Mask
-      depthImage[~maskImage] = np.nan
+      #depthImage[~maskImage] = np.nan
+      #depthImage[maskImage==0] = np.nan
+      #depthImage = np.where(maskImage==[0,0,0], depthImage, np.nan)
+      depthImage = depthImage.astype(float)
+      depthImage[maskImage == 0] = np.nan
+      print(depthImage)
     else:
       # Cut corners and border
       cornerSize = self.cornerCutBox.value
@@ -898,8 +990,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         vflipped = width - (v + 1)
         z = depthImage[u][vflipped]
         #z = depthImage[u][v]
-
-        if (z is not np.nan) and (z < zThreshold):
+        if (not np.isnan(z)) and (z < zThreshold):
           world_x = (z * (u - (height/2)) / fx_d) * (self.imageScaleBox.value * self.centerlineScaleFactor)
           world_y = (z * (v - (width/2)) / fy_d) * (self.imageScaleBox.value * self.centerlineScaleFactor)
           world_z = z * self.depthScaleBox.value * self.centerlineScaleFactor
@@ -907,8 +998,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
           #points.InsertNextPoint(np.array([z * (u - (height/2)) / fx_d, z * (v - (width/2)) / fy_d, z / self.depthDividerBox.value]))
           if colorArray:
             colorArray.InsertNextTuple3(rgbImage[u, vflipped][0], rgbImage[u, vflipped][1], rgbImage[u, vflipped][2])
-
-
+        
     # Create junk polygons so that Slicer can actually display the point cloud
     polydata = vtk.vtkPolyData()
     polydata.SetPoints(points)
@@ -956,6 +1046,11 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # modelPermDisplayNode.SetActiveScalarName("PointCloudColor")
     # modelPermDisplayNode.SetScalarRangeFlag(4)
     # # temp
+
+  def onInitializationICP(self):
+    icpMatrix = self.calculateICPTransform()
+    initialICPNode = self.initializationICPTransformSelector.currentNode()
+    initialICPNode.SetAndObserveMatrixTransformToParent(icpMatrix)
 
   def calculateICPTransform(self):
     #outputTrans = self.icpTransformSelector.currentNode()

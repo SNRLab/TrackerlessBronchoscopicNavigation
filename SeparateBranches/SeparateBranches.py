@@ -103,6 +103,10 @@ class SeparateBranchesWidget(ScriptedLoadableModuleWidget):
     self.createBranchButton = qt.QPushButton("Create Branch")
     IOLayout.addRow(self.createBranchButton)
     self.createBranchButton.connect('clicked()', self.onCreateBranch)
+    
+    self.renameBranchesButton = qt.QPushButton("Rename Branches")
+    IOLayout.addRow(self.renameBranchesButton)
+    self.renameBranchesButton.connect('clicked()', self.onRenameBranches)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -146,7 +150,7 @@ class SeparateBranchesWidget(ScriptedLoadableModuleWidget):
         if n in branching_points:
           newPoint2 = original_points.GetPoint(n)
           distance = math.sqrt(vtk.vtkMath.Distance2BetweenPoints(newPoint1, newPoint2))
-          if distance < 10:
+          if distance < 8:
             points.InsertNextPoint(newPoint2[0], newPoint2[1], newPoint2[2])
           break
       
@@ -157,16 +161,17 @@ class SeparateBranchesWidget(ScriptedLoadableModuleWidget):
         line.GetPointIds().SetId(1, i + 1)
         lines.InsertNextCell(line)
       
-      new_polydata = vtk.vtkPolyData()
-      new_polydata.SetPoints(points)
-      new_polydata.SetLines(lines)
-      
-      model_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
-      model_node.SetAndObservePolyData(new_polydata)
-      model_node.SetName("Branch")
-      slicer.mrmlScene.AddNode(model_node)
-      model_node.CreateDefaultDisplayNodes()
-      model_node.GetModelDisplayNode().SetLineWidth(3)
+      if lines.GetNumberOfCells() > 0:
+        new_polydata = vtk.vtkPolyData()
+        new_polydata.SetPoints(points)
+        new_polydata.SetLines(lines)
+        
+        model_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
+        model_node.SetAndObservePolyData(new_polydata)
+        model_node.SetName("Branch")
+        slicer.mrmlScene.AddNode(model_node)
+        model_node.CreateDefaultDisplayNodes()
+        model_node.GetModelDisplayNode().SetLineWidth(3)
 
   def onRun(self):
     polydata = self.centerlineSelector.currentNode().GetPolyData()
@@ -213,4 +218,12 @@ class SeparateBranchesWidget(ScriptedLoadableModuleWidget):
     slicer.mrmlScene.AddNode(model_node)
     model_node.CreateDefaultDisplayNodes()
     model_node.GetModelDisplayNode().SetLineWidth(3)
+    
+  def onRenameBranches(self):
+    counter = 1
+    for node in slicer.mrmlScene.GetNodesByClass("vtkMRMLModelNode"):
+      if node.GetName() == "Branch":
+        new_name = f"Branch_{counter}"
+        node.SetName(new_name)
+        counter += 1
   
