@@ -270,6 +270,10 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.pointCloudSelector.setMRMLScene(slicer.mrmlScene)
     depthMapModeLayout.addRow("Point Cloud Model: ", self.pointCloudSelector)
 
+    self.centerlineScalingCheckBox = qt.QCheckBox("Centerline Scaling")
+    self.centerlineScalingCheckBox.setChecked(True)
+    depthMapModeLayout.addRow(self.centerlineScalingCheckBox)
+
     self.centerlineSelector = slicer.qMRMLNodeComboBox()
     self.centerlineSelector.nodeTypes = ( ("vtkMRMLModelNode"), "" )
     self.centerlineSelector.selectNodeUponCreation = True
@@ -370,6 +374,12 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # self.icpTransformSelector.setMRMLScene(slicer.mrmlScene)
     # icpLayout.addRow("ICP Transform: ", self.icpTransformSelector)
 
+    self.icpMethodComboBox = qt.QComboBox()
+    self.icpMethodComboBox.addItem('Similarity')
+    self.icpMethodComboBox.addItem('Rigid')
+    self.icpMethodComboBox.setCurrentIndex(0)
+    icpLayout.addRow('ICP Method:', self.icpMethodComboBox)
+
     self.checkMeanDistanceCheckBox = qt.QCheckBox("Check Mean Distance")
     self.checkMeanDistanceCheckBox.setChecked(True)
     icpLayout.addRow(self.checkMeanDistanceCheckBox)
@@ -449,8 +459,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepCount = self.stepStartOffsetBox.value
     self.stepLabel.setText(f'{self.stepStartOffsetBox.value}')
 
-    self.centerlineScaleFactor = 1.0
-
     layoutManager = slicer.app.layoutManager()
     red = layoutManager.sliceWidget('Red')
     redLogic = red.sliceLogic()
@@ -492,7 +500,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
       correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
       inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
-
       #resultMatrix.SetElement(0, 0, scale); resultMatrix.SetElement(1, 1, scale); resultMatrix.SetElement(2, 2, scale)
     
     self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
@@ -509,6 +516,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       startTransformNode = slicer.util.getNode("Start")
       #self.inputTransformSelector.currentNode().GetParentTransformNode().GetParentTransformNode().SetAndObserveMatrixTransformToParent(matrix)
       startTransformNode.SetAndObserveMatrixTransformToParent(matrix)
+
+    if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode() and self.centerlineScalingCheckBox.isChecked():
+      closestRadius = self.calculateClosestCenterlineRadius()
+      self.centerlineStartRadius = closestRadius
+      self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
+      self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
+    else:
+      self.centerlineScaleFactor = 1
   
   def onMaskSelection(self, index):
     if index == 1:
@@ -790,9 +805,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      # predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      # predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
-      # predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
 
       predMatrix.Invert()
 
@@ -847,15 +859,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       self.nudgeLabel.text = f'ICP performed'        
 
-
     # Calculates scale from centerline for the next step from the current step if there is a centerline
-    if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode():
-      closestRadius = self.calculateClosestCenterlineRadius()
-      #print(closestRadius)
-      if self.stepCount <= 2:
-        self.centerlineStartRadius = closestRadius
-      self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
-      self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
+    if self.centerlineScalingCheckBox.isChecked():
+      if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode():
+        closestRadius = self.calculateClosestCenterlineRadius()
+        self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
+        self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
+    else:
+      self.centerlineScaleFactor = 1.0
 
   def get_transform(self, euler, translation, scale, rotationScale):
     eulerValues = [angle * rotationScale for angle in euler.cpu().numpy().squeeze()]
@@ -1143,12 +1154,10 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     icp = vtk.vtkIterativeClosestPointTransform()
     icp.SetSource(movingPolyData)
     icp.SetTarget(fixedPolyData)
-    #icp.GetLandmarkTransform().SetModeToSimilarity()
-    # if self.stepCount == 1+self.stepSkipBox.value:
-    #   icp.GetLandmarkTransform().SetModeToSimilarity()
-    # else:
-    #   icp.GetLandmarkTransform().SetModeToRigidBody()
-    icp.GetLandmarkTransform().SetModeToRigidBody()
+    if self.icpMethodComboBox.currentText == "Similarity":
+      icp.GetLandmarkTransform().SetModeToSimilarity()
+    elif self.icpMethodComboBox.currentText == "Rigid":
+      icp.GetLandmarkTransform().SetModeToRigidBody()
     icp.SetMeanDistanceModeToAbsoluteValue()
     icp.SetMaximumNumberOfIterations(int(self.icpIterationsSlider.value))
     icp.SetMaximumMeanDistance(self.icpMaxDistanceSlider.value)
