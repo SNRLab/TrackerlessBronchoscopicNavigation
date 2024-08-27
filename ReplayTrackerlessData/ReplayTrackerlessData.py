@@ -214,14 +214,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.rotationScaleSliderWidget.minimum = 0.00
     self.rotationScaleSliderWidget.maximum = 100.00
     self.rotationScaleSliderWidget.singleStep = 0.01
-    self.rotationScaleSliderWidget.value = 4.00
+    self.rotationScaleSliderWidget.value = 2.00
     stepModeLayout.addRow("Rotation Scale Factor:", self.rotationScaleSliderWidget)
 
     self.nudgeInterval = qt.QSpinBox()
     self.nudgeInterval.setSingleStep(1)
     self.nudgeInterval.setMaximum(100)
     self.nudgeInterval.setMinimum(1)
-    self.nudgeInterval.value = 4
+    self.nudgeInterval.value = 3
     stepModeLayout.addRow("Nudge Interval: ", self.nudgeInterval)
 
     self.nudgeFactorWidget = ctk.ctkSliderWidget()
@@ -229,7 +229,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeFactorWidget.minimum = 0.00
     self.nudgeFactorWidget.maximum = 100.00
     self.nudgeFactorWidget.singleStep = 0.01
-    self.nudgeFactorWidget.value = 0.3
+    self.nudgeFactorWidget.value = 0.4
     stepModeLayout.addRow("Nudge Factor:", self.nudgeFactorWidget)
 
     # self.nudgeTransformSelector = slicer.qMRMLNodeComboBox()
@@ -481,11 +481,15 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       correctionMatrix = vtk.vtkMatrix4x4()
       inverseCorrectionMatrix = vtk.vtkMatrix4x4()
       if self.flipPredictionCheckbox.isChecked():
-        correctionMatrix.SetElement(0, 0, -1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, -1)
-        inverseCorrectionMatrix.SetElement(0, 0, -1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+        #correctionMatrix.SetElement(0, 0, -1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, -1)
+        correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
+        #inverseCorrectionMatrix.SetElement(0, 0, -1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+        inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
       else:
-        correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, -1); correctionMatrix.SetElement(2, 2, -1)
-        inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, -1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+        #correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, -1); correctionMatrix.SetElement(2, 2, -1)
+        correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
+        #inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, -1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+        inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
       correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
       inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
 
@@ -681,6 +685,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
       predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
 
+      predMatrix.Invert()
+
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
 
@@ -708,6 +714,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       # predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
       # predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
 
+      predMatrix.Invert()
+
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
       
@@ -732,17 +740,31 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         nudgeNorm = np.linalg.norm(nudgeVector)
         nudgeFactor = min(nudgeNorm, self.nudgeFactorWidget.value)
         nudgeVector = (nudgeVector/nudgeNorm) * nudgeFactor
-        
-        # nudgedMatrix = vtk.vtkMatrix4x4()
-        # self.inputTransformSelector.currentNode().GetMatrixTransformToParent(nudgedMatrix)
-        # nudgedMatrix.SetElement(0,3,nudgedMatrix.GetElement(0,3)+nudgeVector[0])
-        # nudgedMatrix.SetElement(1,3,nudgedMatrix.GetElement(1,3)+nudgeVector[1])
-        # nudgedMatrix.SetElement(2,3,nudgedMatrix.GetElement(2,3)+nudgeVector[2])
-        # self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(nudgedMatrix)
 
-        combinedMatrix.SetElement(0,3,combinedMatrix.GetElement(0,3)+nudgeVector[0])
-        combinedMatrix.SetElement(1,3,combinedMatrix.GetElement(1,3)+nudgeVector[1])
-        combinedMatrix.SetElement(2,3,combinedMatrix.GetElement(2,3)+nudgeVector[2])
+        originalPoint = np.array([previousMatrix.GetElement(0,3), previousMatrix.GetElement(1,3), previousMatrix.GetElement(2,3)])
+        originalVector = np.array([combinedMatrix.GetElement(0,3)-originalPoint[0], combinedMatrix.GetElement(1,3)-originalPoint[1], combinedMatrix.GetElement(2,3)-originalPoint[2]])
+        originalNorm = np.linalg.norm(originalVector)
+
+        nudgedPoint = [combinedMatrix.GetElement(0,3)+nudgeVector[0], combinedMatrix.GetElement(1,3)+nudgeVector[1], combinedMatrix.GetElement(2,3)+nudgeVector[2]]
+        nudgedVector = np.array([nudgedPoint[0]-previousMatrix.GetElement(0,3), nudgedPoint[1]-previousMatrix.GetElement(1,3), nudgedPoint[2]-previousMatrix.GetElement(2,3)])
+        nudgedNorm = np.linalg.norm(nudgedVector)
+
+        adjustedVector = nudgedPoint-originalPoint
+        adjustedNorm = np.linalg.norm(adjustedVector)
+        adjustedVector = (adjustedVector/adjustedNorm) * originalNorm
+
+        # combinedMatrix.SetElement(0,3,originalPoint[0]+adjustedVector[0])
+        # combinedMatrix.SetElement(1,3,originalPoint[1]+adjustedVector[1])
+        # combinedMatrix.SetElement(2,3,originalPoint[2]+adjustedVector[2])
+
+        magnitudeDifference = originalNorm - nudgedNorm
+        originalVector = (originalVector/originalNorm) * magnitudeDifference
+
+        combinedMatrix.SetElement(0,3,originalPoint[0]+nudgedVector[0]+originalVector[0])
+        combinedMatrix.SetElement(1,3,originalPoint[1]+nudgedVector[1]+originalVector[1])
+        combinedMatrix.SetElement(2,3,originalPoint[2]+nudgedVector[2]+originalVector[2])
+
+        #print(combinedMatrix.GetElement(0,3), combinedMatrix.GetElement(1,3), combinedMatrix.GetElement(2,3))
 
         self.nudgeLabel.text = f'Nudge by {nudgeFactor}'
       else:
@@ -771,6 +793,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       # predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
       # predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
       # predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
+
+      predMatrix.Invert()
 
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
@@ -832,7 +856,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         self.centerlineStartRadius = closestRadius
       self.centerlineScaleFactor = closestRadius / self.centerlineStartRadius
       self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
-    
+
   def get_transform(self, euler, translation, scale, rotationScale):
     eulerValues = [angle * rotationScale for angle in euler.cpu().numpy().squeeze()]
     #eulerValues = [angle for angle in euler.cpu().numpy().squeeze()]
@@ -944,14 +968,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     height = len(depthImage)
     width = len(depthImage[0])
 
-    if maskImage.any():
+    if maskImage is not None:
       # Mask
       #depthImage[~maskImage] = np.nan
       #depthImage[maskImage==0] = np.nan
       #depthImage = np.where(maskImage==[0,0,0], depthImage, np.nan)
       depthImage = depthImage.astype(float)
       depthImage[maskImage == 0] = np.nan
-      print(depthImage)
+      #print(depthImage)
     else:
       # Cut corners and border
       cornerSize = self.cornerCutBox.value
@@ -988,14 +1012,13 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     for u in range(height):
       for v in range(width):
         vflipped = width - (v + 1)
+        #vflipped = v
         z = depthImage[u][vflipped]
-        #z = depthImage[u][v]
         if (not np.isnan(z)) and (z < zThreshold):
           world_x = (z * (u - (height/2)) / fx_d) * (self.imageScaleBox.value * self.centerlineScaleFactor)
           world_y = (z * (v - (width/2)) / fy_d) * (self.imageScaleBox.value * self.centerlineScaleFactor)
           world_z = z * self.depthScaleBox.value * self.centerlineScaleFactor
           points.InsertNextPoint(world_x, world_y, world_z)
-          #points.InsertNextPoint(np.array([z * (u - (height/2)) / fx_d, z * (v - (width/2)) / fy_d, z / self.depthDividerBox.value]))
           if colorArray:
             colorArray.InsertNextTuple3(rgbImage[u, vflipped][0], rgbImage[u, vflipped][1], rgbImage[u, vflipped][2])
         
@@ -1050,7 +1073,18 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
   def onInitializationICP(self):
     icpMatrix = self.calculateICPTransform()
     initialICPNode = self.initializationICPTransformSelector.currentNode()
-    initialICPNode.SetAndObserveMatrixTransformToParent(icpMatrix)
+
+    # inverseTransformMatrix = vtk.vtkMatrix4x4()
+    # initialICPNode.GetParentTransformNode().GetMatrixTransformToWorld(inverseTransformMatrix)
+    # inverseTransformMatrix.Invert()
+    # icpMatrix.Multiply4x4(inverseTransformMatrix, icpMatrix, icpMatrix)
+
+    originalICPMatrix = vtk.vtkMatrix4x4()
+    combinedICPMatrix = vtk.vtkMatrix4x4()
+    initialICPNode.GetMatrixTransformToParent(originalICPMatrix)
+    combinedICPMatrix.Multiply4x4(originalICPMatrix, icpMatrix, combinedICPMatrix)
+
+    initialICPNode.SetAndObserveMatrixTransformToParent(combinedICPMatrix)
 
   def calculateICPTransform(self):
     #outputTrans = self.icpTransformSelector.currentNode()
@@ -1110,10 +1144,11 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     icp.SetSource(movingPolyData)
     icp.SetTarget(fixedPolyData)
     #icp.GetLandmarkTransform().SetModeToSimilarity()
-    if self.stepCount == 1+self.stepSkipBox.value:
-      icp.GetLandmarkTransform().SetModeToSimilarity()
-    else:
-      icp.GetLandmarkTransform().SetModeToRigidBody()
+    # if self.stepCount == 1+self.stepSkipBox.value:
+    #   icp.GetLandmarkTransform().SetModeToSimilarity()
+    # else:
+    #   icp.GetLandmarkTransform().SetModeToRigidBody()
+    icp.GetLandmarkTransform().SetModeToRigidBody()
     icp.SetMeanDistanceModeToAbsoluteValue()
     icp.SetMaximumNumberOfIterations(int(self.icpIterationsSlider.value))
     icp.SetMaximumMeanDistance(self.icpMaxDistanceSlider.value)
