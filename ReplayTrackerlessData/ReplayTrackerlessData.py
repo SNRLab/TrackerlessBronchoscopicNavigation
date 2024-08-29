@@ -168,7 +168,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepSkipBox.setSingleStep(1)
     self.stepSkipBox.setMaximum(100)
     self.stepSkipBox.setMinimum(1)
-    self.stepSkipBox.value = 4
+    self.stepSkipBox.value = 2
     stepModeLayout.addRow("Step skip: ", self.stepSkipBox)
 
     self.stepLabel = qt.QLabel("1")
@@ -214,14 +214,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.rotationScaleSliderWidget.minimum = 0.00
     self.rotationScaleSliderWidget.maximum = 100.00
     self.rotationScaleSliderWidget.singleStep = 0.01
-    self.rotationScaleSliderWidget.value = 2.00
+    self.rotationScaleSliderWidget.value = 1.00
     stepModeLayout.addRow("Rotation Scale Factor:", self.rotationScaleSliderWidget)
 
     self.nudgeInterval = qt.QSpinBox()
     self.nudgeInterval.setSingleStep(1)
     self.nudgeInterval.setMaximum(100)
     self.nudgeInterval.setMinimum(1)
-    self.nudgeInterval.value = 3
+    self.nudgeInterval.value = 2
     stepModeLayout.addRow("Nudge Interval: ", self.nudgeInterval)
 
     self.nudgeFactorWidget = ctk.ctkSliderWidget()
@@ -229,8 +229,16 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeFactorWidget.minimum = 0.00
     self.nudgeFactorWidget.maximum = 100.00
     self.nudgeFactorWidget.singleStep = 0.01
-    self.nudgeFactorWidget.value = 0.4
+    self.nudgeFactorWidget.value = 0.2
     stepModeLayout.addRow("Nudge Factor:", self.nudgeFactorWidget)
+
+    self.nudgeRotationFactorWidget = ctk.ctkSliderWidget()
+    self.nudgeRotationFactorWidget.setDecimals(2)
+    self.nudgeRotationFactorWidget.minimum = 0.00
+    self.nudgeRotationFactorWidget.maximum = 180.00
+    self.nudgeRotationFactorWidget.singleStep = 0.01
+    self.nudgeRotationFactorWidget.value = 0.2
+    stepModeLayout.addRow("Nudge Rotation Factor (Degrees):", self.nudgeRotationFactorWidget)
 
     # self.nudgeTransformSelector = slicer.qMRMLNodeComboBox()
     # self.nudgeTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
@@ -472,6 +480,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
     self.nudgeLabel.text = ""
     scale = self.scaleSliderWidget.value
+
+    self.previousClosestPoint = [np.nan, np.nan, np.nan, 1]
 
     resultMatrix = vtk.vtkMatrix4x4()
     if self.methodComboBox.currentText == "Ground Truth" or self.methodComboBox.currentText == "cGAN with ICP":
@@ -725,9 +735,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      # predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      # predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
-      # predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
 
       predMatrix.Invert()
 
@@ -736,8 +743,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       
       if ((self.stepCount-1) % self.nudgeInterval.value) == 0 and self.stepCount != 1:
         radiusCenterlineNode = self.centerlineSelector.currentNode()
-        #currentMatrix = vtk.vtkMatrix4x4()
-        #self.inputTransformSelector.currentNode().GetMatrixTransformToWorld(currentMatrix)
         inverseParentMatrix = vtk.vtkMatrix4x4()
         self.inputTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToWorld(inverseParentMatrix)
         combinedMatrix_world = vtk.vtkMatrix4x4()
@@ -745,7 +750,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         inverseParentMatrix.Invert()
 
         # Closest point on centerline
-        #closestPoint, idx = self.findClosestPoint(radiusCenterlineNode, [currentMatrix.GetElement(0,3), currentMatrix.GetElement(1,3), currentMatrix.GetElement(2,3)])
         closestPoint = self.findClosestPointOnLine(radiusCenterlineNode, [combinedMatrix_world.GetElement(0,3), combinedMatrix_world.GetElement(1,3), combinedMatrix_world.GetElement(2,3)])
         closestPoint = list(closestPoint) + [1]
         closestPointTransformed = [0,0,0,1]
@@ -768,18 +772,33 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         adjustedNorm = np.linalg.norm(adjustedVector)
         adjustedVector = (adjustedVector/adjustedNorm) * originalNorm
 
-        # combinedMatrix.SetElement(0,3,originalPoint[0]+adjustedVector[0])
-        # combinedMatrix.SetElement(1,3,originalPoint[1]+adjustedVector[1])
-        # combinedMatrix.SetElement(2,3,originalPoint[2]+adjustedVector[2])
-
         magnitudeDifference = originalNorm - nudgedNorm
         originalVector = (originalVector/originalNorm) * magnitudeDifference
 
         combinedMatrix.SetElement(0,3,originalPoint[0]+nudgedVector[0]+originalVector[0])
         combinedMatrix.SetElement(1,3,originalPoint[1]+nudgedVector[1]+originalVector[1])
         combinedMatrix.SetElement(2,3,originalPoint[2]+nudgedVector[2]+originalVector[2])
+        # combinedMatrix.SetElement(0,3,originalPoint[0]+nudgedVector[0])
+        # combinedMatrix.SetElement(1,3,originalPoint[1]+nudgedVector[1])
+        # combinedMatrix.SetElement(2,3,originalPoint[2]+nudgedVector[2])
 
-        #print(combinedMatrix.GetElement(0,3), combinedMatrix.GetElement(1,3), combinedMatrix.GetElement(2,3))
+        # Re-orient to center line vector
+        if self.previousClosestPoint != [np.nan, np.nan, np.nan, 1]:
+          centerlineVector = np.array(closestPointTransformed) - np.array(self.previousClosestPoint)
+          poseVector = [0,0,1,1]
+          combinedRotationMatrix = self.getRotationMatrixfromMatrix(combinedMatrix)
+          combinedRotationMatrix.MultiplyPoint(poseVector, poseVector)
+          poseVector = np.array(poseVector)
+
+          if not np.array_equal(centerlineVector,[0.0,0.0,0.0,0.0]):
+            centerlineRotationMatrix = self.numpy_to_vtk_matrix(self.partial_rotation_matrix_to_vector(poseVector[:3], centerlineVector[:3], self.nudgeRotationFactorWidget.value))
+            centerlineRotationMatrix.Multiply4x4(combinedRotationMatrix, centerlineRotationMatrix, centerlineRotationMatrix)
+
+            combinedMatrix.SetElement(0,0,centerlineRotationMatrix.GetElement(0,0)); combinedMatrix.SetElement(0,1,centerlineRotationMatrix.GetElement(0,1)); combinedMatrix.SetElement(0,2,centerlineRotationMatrix.GetElement(0,2))
+            combinedMatrix.SetElement(1,0,centerlineRotationMatrix.GetElement(1,0)); combinedMatrix.SetElement(1,1,centerlineRotationMatrix.GetElement(1,1)); combinedMatrix.SetElement(1,2,centerlineRotationMatrix.GetElement(1,2))
+            combinedMatrix.SetElement(2,0,centerlineRotationMatrix.GetElement(2,0)); combinedMatrix.SetElement(2,1,centerlineRotationMatrix.GetElement(2,1)); combinedMatrix.SetElement(2,2,centerlineRotationMatrix.GetElement(2,2))
+
+        self.previousClosestPoint = closestPointTransformed
 
         self.nudgeLabel.text = f'Nudge by {nudgeFactor}'
       else:
@@ -880,6 +899,51 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     #T[:3,3] = (translation.cpu().numpy().squeeze())
     M = np.matmul(T, final_mat)
     return M
+
+  def getRotationMatrixfromMatrix(self, matrix):
+    rotationMatrix = vtk.vtkMatrix4x4()
+    rotationMatrix.Identity()
+    for j in range(3):
+      for i in range(3):
+        rotationMatrix.SetElement(i, j, matrix.GetElement(i, j))
+    return rotationMatrix
+
+  def partial_rotation_matrix_to_vector(self, vec1, vec2, max_angle_deg):
+    """ Create a 4x4 transform matrix to partially rotate vec1 towards vec2 by a maximum angle """
+    def rotation_matrix_from_axis_angle(axis, angle):
+        """ Create a rotation matrix from an axis and angle using Rodrigues' rotation formula """
+        axis = axis / np.linalg.norm(axis)
+        cos_angle = np.cos(angle)
+        sin_angle = np.sin(angle)
+        one_minus_cos = 1 - cos_angle
+        x, y, z = axis
+        rotation_matrix = np.array([
+            [cos_angle + x*x*one_minus_cos, x*y*one_minus_cos - z*sin_angle, x*z*one_minus_cos + y*sin_angle],
+            [y*x*one_minus_cos + z*sin_angle, cos_angle + y*y*one_minus_cos, y*z*one_minus_cos - x*sin_angle],
+            [z*x*one_minus_cos - y*sin_angle, z*y*one_minus_cos + x*sin_angle, cos_angle + z*z*one_minus_cos]
+        ])
+        return rotation_matrix
+
+    # Normalize the vectors
+    vec1 = vec1 / np.linalg.norm(vec1)
+    vec2 = vec2 / np.linalg.norm(vec2)
+
+    # Calculate the full rotation axis and angle
+    axis = np.cross(vec1, vec2)
+    full_angle = np.arccos(np.dot(vec1, vec2))
+
+    # Scale the angle to the desired partial angle
+    max_angle_rad = np.deg2rad(max_angle_deg)
+    partial_angle = min(full_angle, max_angle_rad)
+
+    # Create the partial rotation matrix
+    partial_rot_matrix = rotation_matrix_from_axis_angle(axis, partial_angle)
+
+    # Create a 4x4 transform matrix
+    transform_matrix = np.eye(4)
+    transform_matrix[:3, :3] = partial_rot_matrix
+
+    return transform_matrix
 
   def vtk_to_numpy_matrix(self, vtk_matrix):
     numpy_matrix = np.zeros((4, 4))
