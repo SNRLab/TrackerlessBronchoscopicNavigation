@@ -482,6 +482,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     scale = self.scaleSliderWidget.value
 
     self.previousClosestPoint = [np.nan, np.nan, np.nan, 1]
+    centerlinePointNode = slicer.mrmlScene.GetFirstNodeByName("CenterlinePoint")
+    if centerlinePointNode:
+      centerlinePointNode.SetNthControlPointPosition(0, 0, 0, 0)
 
     resultMatrix = vtk.vtkMatrix4x4()
     if self.methodComboBox.currentText == "Ground Truth" or self.methodComboBox.currentText == "cGAN with ICP":
@@ -751,6 +754,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
         # Closest point on centerline
         closestPoint = self.findClosestPointOnLine(radiusCenterlineNode, [combinedMatrix_world.GetElement(0,3), combinedMatrix_world.GetElement(1,3), combinedMatrix_world.GetElement(2,3)])
+        centerlinePointNode = slicer.mrmlScene.GetFirstNodeByName("CenterlinePoint")
+        if centerlinePointNode:
+          centerlinePointNode.SetNthControlPointPosition(0, closestPoint[0], closestPoint[1], closestPoint[2])
         closestPoint = list(closestPoint) + [1]
         closestPointTransformed = [0,0,0,1]
         inverseParentMatrix.MultiplyPoint(closestPoint, closestPointTransformed) # in pose space
