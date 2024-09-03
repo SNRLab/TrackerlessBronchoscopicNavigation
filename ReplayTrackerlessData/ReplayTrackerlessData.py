@@ -168,7 +168,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepSkipBox.setSingleStep(1)
     self.stepSkipBox.setMaximum(100)
     self.stepSkipBox.setMinimum(1)
-    self.stepSkipBox.value = 2
+    self.stepSkipBox.value = 3
     stepModeLayout.addRow("Step skip: ", self.stepSkipBox)
 
     self.stepLabel = qt.QLabel("1")
@@ -187,7 +187,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepFPSBox.setMaximum(144)
     self.stepFPSBox.setMinimum(1)
     self.stepFPSBox.setSuffix(" FPS")
-    self.stepFPSBox.value = 40
+    self.stepFPSBox.value = 30
     stepModeLayout.addRow(self.stepFPSBox)
 
     self.scaleSliderWidget = ctk.ctkSliderWidget()
@@ -195,7 +195,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.scaleSliderWidget.minimum = 0.00
     self.scaleSliderWidget.maximum = 1000.00
     self.scaleSliderWidget.singleStep = 0.01
-    self.scaleSliderWidget.value = 24.00
+    self.scaleSliderWidget.value = 27.00
     stepModeLayout.addRow("Scale Factor:", self.scaleSliderWidget)
 
     self.flipPredictionCheckbox = qt.QCheckBox("Flip Prediction")
@@ -221,7 +221,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeInterval.setSingleStep(1)
     self.nudgeInterval.setMaximum(100)
     self.nudgeInterval.setMinimum(1)
-    self.nudgeInterval.value = 2
+    self.nudgeInterval.value = 3
     stepModeLayout.addRow("Nudge Interval: ", self.nudgeInterval)
 
     self.nudgeFactorWidget = ctk.ctkSliderWidget()
@@ -229,7 +229,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeFactorWidget.minimum = 0.00
     self.nudgeFactorWidget.maximum = 100.00
     self.nudgeFactorWidget.singleStep = 0.01
-    self.nudgeFactorWidget.value = 0.2
+    self.nudgeFactorWidget.value = 1.0
     stepModeLayout.addRow("Nudge Factor:", self.nudgeFactorWidget)
 
     self.nudgeRotationFactorWidget = ctk.ctkSliderWidget()
@@ -237,7 +237,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeRotationFactorWidget.minimum = 0.00
     self.nudgeRotationFactorWidget.maximum = 180.00
     self.nudgeRotationFactorWidget.singleStep = 0.01
-    self.nudgeRotationFactorWidget.value = 0.2
+    self.nudgeRotationFactorWidget.value = 1.50
     stepModeLayout.addRow("Nudge Rotation Factor (Degrees):", self.nudgeRotationFactorWidget)
 
     # self.nudgeTransformSelector = slicer.qMRMLNodeComboBox()
@@ -487,33 +487,33 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       centerlinePointNode.SetNthControlPointPosition(0, 0, 0, 0)
 
     resultMatrix = vtk.vtkMatrix4x4()
-    if self.methodComboBox.currentText == "Ground Truth" or self.methodComboBox.currentText == "cGAN with ICP":
-      correctionNode = slicer.util.getNode("Correction")
-      inverseCorrectionNode = slicer.util.getNode("InverseCorrection")
-      correctionMatrix = vtk.vtkMatrix4x4()
-      inverseCorrectionMatrix = vtk.vtkMatrix4x4()
-      correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
-      inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
-      correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
-      inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
-    else:
-      correctionNode = slicer.util.getNode("Correction")
-      inverseCorrectionNode = slicer.util.getNode("InverseCorrection")
-      correctionMatrix = vtk.vtkMatrix4x4()
-      inverseCorrectionMatrix = vtk.vtkMatrix4x4()
-      if self.flipPredictionCheckbox.isChecked():
-        #correctionMatrix.SetElement(0, 0, -1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, -1)
-        correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
-        #inverseCorrectionMatrix.SetElement(0, 0, -1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, -1)
-        inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
-      else:
-        #correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, -1); correctionMatrix.SetElement(2, 2, -1)
-        correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
-        #inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, -1); inverseCorrectionMatrix.SetElement(2, 2, -1)
-        inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
-      correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
-      inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
-      #resultMatrix.SetElement(0, 0, scale); resultMatrix.SetElement(1, 1, scale); resultMatrix.SetElement(2, 2, scale)
+    # if self.methodComboBox.currentText == "Ground Truth" or self.methodComboBox.currentText == "cGAN with ICP":
+    #   correctionNode = slicer.util.getNode("Correction")
+    #   inverseCorrectionNode = slicer.util.getNode("InverseCorrection")
+    #   correctionMatrix = vtk.vtkMatrix4x4()
+    #   inverseCorrectionMatrix = vtk.vtkMatrix4x4()
+    #   correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
+    #   inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
+    #   correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
+    #   inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
+    # else:
+    #   correctionNode = slicer.util.getNode("Correction")
+    #   inverseCorrectionNode = slicer.util.getNode("InverseCorrection")
+    #   correctionMatrix = vtk.vtkMatrix4x4()
+    #   inverseCorrectionMatrix = vtk.vtkMatrix4x4()
+    #   if self.flipPredictionCheckbox.isChecked():
+    #     #correctionMatrix.SetElement(0, 0, -1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, -1)
+    #     correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
+    #     #inverseCorrectionMatrix.SetElement(0, 0, -1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+    #     inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
+    #   else:
+    #     #correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, -1); correctionMatrix.SetElement(2, 2, -1)
+    #     correctionMatrix.SetElement(0, 0, 1); correctionMatrix.SetElement(1, 1, 1); correctionMatrix.SetElement(2, 2, 1)
+    #     #inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, -1); inverseCorrectionMatrix.SetElement(2, 2, -1)
+    #     inverseCorrectionMatrix.SetElement(0, 0, 1); inverseCorrectionMatrix.SetElement(1, 1, 1); inverseCorrectionMatrix.SetElement(2, 2, 1)
+    #   correctionNode.SetAndObserveMatrixTransformToParent(correctionMatrix)
+    #   inverseCorrectionNode.SetAndObserveMatrixTransformToParent(inverseCorrectionMatrix)
+    #   #resultMatrix.SetElement(0, 0, scale); resultMatrix.SetElement(1, 1, scale); resultMatrix.SetElement(2, 2, scale)
     
     self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(resultMatrix)
     # Set the initialization transform based on the first ground truth frame
@@ -704,20 +704,18 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       step = ((self.stepCount-1-self.stepSkipBox.value) // self.stepSkipBox.value)+1
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
-      #combinedNpMatrix = np.matmul(previousNpMatrix, pred_pose)
-      #combinedNpMatrix = combinedNpMatrix * scale
-      #combinedMatrix = self.numpy_to_vtk_matrix(combinedNpMatrix)
-
       predMatrix = self.numpy_to_vtk_matrix(pred_pose)
-      predMatrix.SetElement(0,3,predMatrix.GetElement(0,3))
-      predMatrix.SetElement(1,3,predMatrix.GetElement(1,3))
-      predMatrix.SetElement(2,3,predMatrix.GetElement(2,3))
 
       predMatrix.Invert()
 
       combinedMatrix = vtk.vtkMatrix4x4()
       combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
 
+      # pointCloudRegMatrix = vtk.vtkMatrix4x4()
+      # pointCloudRegMatrix.SetElement(0,0,-0.216326); pointCloudRegMatrix.SetElement(0,1,0.904739); pointCloudRegMatrix.SetElement(0,2,-0.366804)
+      # pointCloudRegMatrix.SetElement(1,0,-0.974177); pointCloudRegMatrix.SetElement(1,1,-0.224864); pointCloudRegMatrix.SetElement(1,2,0.0198759)
+      # pointCloudRegMatrix.SetElement(2,0,-0.0646702); pointCloudRegMatrix.SetElement(2,1,0.362113); pointCloudRegMatrix.SetElement(2,2,0.929956)
+      # pointCloudRegMatrix.Multiply4x4(pointCloudRegMatrix, combinedMatrix, combinedMatrix)
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
 
     # ------------------------------ ICP with Pose ------------------------------
@@ -792,11 +790,31 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         if self.previousClosestPoint != [np.nan, np.nan, np.nan, 1]:
           centerlineVector = np.array(closestPointTransformed) - np.array(self.previousClosestPoint)
           poseVector = [0,0,1,1]
+
           combinedRotationMatrix = self.getRotationMatrixfromMatrix(combinedMatrix)
           combinedRotationMatrix.MultiplyPoint(poseVector, poseVector)
+
+          pointCloudRegMatrix = vtk.vtkMatrix4x4()
+          pointCloudRegNode = slicer.util.getNode("PointCloudReg")
+          pointCloudRegNode.GetMatrixTransformToParent(pointCloudRegMatrix)
+          
+          # blah = 10
+          # lineNode1 = slicer.util.getNode("InitialPoseVector")
+          # lineNode1.SetNthControlPointPosition(0,combinedMatrix.GetElement(0,3),combinedMatrix.GetElement(1,3),combinedMatrix.GetElement(2,3))
+          # lineNode1.SetNthControlPointPosition(1,poseVector[0]*blah+combinedMatrix.GetElement(0,3),poseVector[1]*blah+combinedMatrix.GetElement(1,3),poseVector[2]*blah+combinedMatrix.GetElement(2,3))
+
+          pointCloudRegMatrix.MultiplyPoint(poseVector, poseVector)
           poseVector = np.array(poseVector)
 
+          # lineNode2 = slicer.util.getNode("PointCloudPoseVector")
+          # lineNode2.SetNthControlPointPosition(0,combinedMatrix.GetElement(0,3),combinedMatrix.GetElement(1,3),combinedMatrix.GetElement(2,3))
+          # lineNode2.SetNthControlPointPosition(1,poseVector[0]*blah+combinedMatrix.GetElement(0,3),poseVector[1]*blah+combinedMatrix.GetElement(1,3),poseVector[2]*blah+combinedMatrix.GetElement(2,3))
+
           if not np.array_equal(centerlineVector,[0.0,0.0,0.0,0.0]):
+            # lineNode3 = slicer.util.getNode("CenterlineVector")
+            # lineNode3.SetNthControlPointPosition(0,combinedMatrix.GetElement(0,3),combinedMatrix.GetElement(1,3),combinedMatrix.GetElement(2,3))
+            # lineNode3.SetNthControlPointPosition(1,centerlineVector[0]*blah+combinedMatrix.GetElement(0,3),centerlineVector[1]*blah+combinedMatrix.GetElement(1,3),centerlineVector[2]*blah+combinedMatrix.GetElement(2,3))
+            
             centerlineRotationMatrix = self.numpy_to_vtk_matrix(self.partial_rotation_matrix_to_vector(poseVector[:3], centerlineVector[:3], self.nudgeRotationFactorWidget.value))
             centerlineRotationMatrix.Multiply4x4(combinedRotationMatrix, centerlineRotationMatrix, centerlineRotationMatrix)
 
@@ -810,6 +828,11 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       else:
         self.nudgeLabel.text = ""
 
+      # pointCloudRegMatrix = vtk.vtkMatrix4x4()
+      # pointCloudRegMatrix.SetElement(0,0,-0.216326); pointCloudRegMatrix.SetElement(0,1,0.904739); pointCloudRegMatrix.SetElement(0,2,-0.366804)
+      # pointCloudRegMatrix.SetElement(1,0,-0.974177); pointCloudRegMatrix.SetElement(1,1,-0.224864); pointCloudRegMatrix.SetElement(1,2,0.0198759)
+      # pointCloudRegMatrix.SetElement(2,0,-0.0646702); pointCloudRegMatrix.SetElement(2,1,0.362113); pointCloudRegMatrix.SetElement(2,2,0.929956)
+      # pointCloudRegMatrix.Multiply4x4(pointCloudRegMatrix, combinedMatrix, combinedMatrix)
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
 
     # ------------------------------ ICP with Pose ------------------------------
