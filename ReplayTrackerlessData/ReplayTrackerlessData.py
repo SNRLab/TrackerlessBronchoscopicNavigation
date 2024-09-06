@@ -229,7 +229,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeFactorWidget.minimum = 0.00
     self.nudgeFactorWidget.maximum = 100.00
     self.nudgeFactorWidget.singleStep = 0.01
-    self.nudgeFactorWidget.value = 1.0
+    self.nudgeFactorWidget.value = 0.5
     stepModeLayout.addRow("Nudge Factor:", self.nudgeFactorWidget)
 
     self.nudgeRotationFactorWidget = ctk.ctkSliderWidget()
@@ -237,7 +237,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.nudgeRotationFactorWidget.minimum = 0.00
     self.nudgeRotationFactorWidget.maximum = 180.00
     self.nudgeRotationFactorWidget.singleStep = 0.01
-    self.nudgeRotationFactorWidget.value = 1.50
+    self.nudgeRotationFactorWidget.value = 0.5
     stepModeLayout.addRow("Nudge Rotation Factor (Degrees):", self.nudgeRotationFactorWidget)
 
     self.nudgeLabel = qt.QLabel("")
@@ -775,13 +775,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
           magnitudeDifference = originalNorm - nudgedNorm
           originalVector = (originalVector/originalNorm) * magnitudeDifference
 
-          combinedMatrix.SetElement(0,3,originalPoint[0]+nudgedVector[0]+originalVector[0])
-          combinedMatrix.SetElement(1,3,originalPoint[1]+nudgedVector[1]+originalVector[1])
-          combinedMatrix.SetElement(2,3,originalPoint[2]+nudgedVector[2]+originalVector[2])
-          # combinedMatrix.SetElement(0,3,originalPoint[0]+nudgedVector[0])
-          # combinedMatrix.SetElement(1,3,originalPoint[1]+nudgedVector[1])
-          # combinedMatrix.SetElement(2,3,originalPoint[2]+nudgedVector[2])
-
+          centerlineVector = np.array([0,0,0])
           # Re-orient to center line vector
           if self.previousClosestPoint != [np.nan, np.nan, np.nan, 1]:
             centerlineVector = np.array(closestPointTransformed) - np.array(self.previousClosestPoint)
@@ -794,29 +788,27 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
             pointCloudRegNode = slicer.util.getNode("PointCloudReg")
             pointCloudRegNode.GetMatrixTransformToParent(pointCloudRegMatrix)
             
-            # blah = 10
-            # lineNode1 = slicer.util.getNode("InitialPoseVector")
-            # lineNode1.SetNthControlPointPosition(0,combinedMatrix.GetElement(0,3),combinedMatrix.GetElement(1,3),combinedMatrix.GetElement(2,3))
-            # lineNode1.SetNthControlPointPosition(1,poseVector[0]*blah+combinedMatrix.GetElement(0,3),poseVector[1]*blah+combinedMatrix.GetElement(1,3),poseVector[2]*blah+combinedMatrix.GetElement(2,3))
-
             pointCloudRegMatrix.MultiplyPoint(poseVector, poseVector)
             poseVector = np.array(poseVector)
 
-            # lineNode2 = slicer.util.getNode("PointCloudPoseVector")
-            # lineNode2.SetNthControlPointPosition(0,combinedMatrix.GetElement(0,3),combinedMatrix.GetElement(1,3),combinedMatrix.GetElement(2,3))
-            # lineNode2.SetNthControlPointPosition(1,poseVector[0]*blah+combinedMatrix.GetElement(0,3),poseVector[1]*blah+combinedMatrix.GetElement(1,3),poseVector[2]*blah+combinedMatrix.GetElement(2,3))
-
             if not np.array_equal(centerlineVector,[0.0,0.0,0.0,0.0]):
-              # lineNode3 = slicer.util.getNode("CenterlineVector")
-              # lineNode3.SetNthControlPointPosition(0,combinedMatrix.GetElement(0,3),combinedMatrix.GetElement(1,3),combinedMatrix.GetElement(2,3))
-              # lineNode3.SetNthControlPointPosition(1,centerlineVector[0]*blah+combinedMatrix.GetElement(0,3),centerlineVector[1]*blah+combinedMatrix.GetElement(1,3),centerlineVector[2]*blah+combinedMatrix.GetElement(2,3))
-              
               centerlineRotationMatrix = self.numpy_to_vtk_matrix(self.partial_rotation_matrix_to_vector(poseVector[:3], centerlineVector[:3], self.nudgeRotationFactorWidget.value))
               centerlineRotationMatrix.Multiply4x4(combinedRotationMatrix, centerlineRotationMatrix, centerlineRotationMatrix)
 
               combinedMatrix.SetElement(0,0,centerlineRotationMatrix.GetElement(0,0)); combinedMatrix.SetElement(0,1,centerlineRotationMatrix.GetElement(0,1)); combinedMatrix.SetElement(0,2,centerlineRotationMatrix.GetElement(0,2))
               combinedMatrix.SetElement(1,0,centerlineRotationMatrix.GetElement(1,0)); combinedMatrix.SetElement(1,1,centerlineRotationMatrix.GetElement(1,1)); combinedMatrix.SetElement(1,2,centerlineRotationMatrix.GetElement(1,2))
               combinedMatrix.SetElement(2,0,centerlineRotationMatrix.GetElement(2,0)); combinedMatrix.SetElement(2,1,centerlineRotationMatrix.GetElement(2,1)); combinedMatrix.SetElement(2,2,centerlineRotationMatrix.GetElement(2,2))
+
+          centerlineNorm = np.linalg.norm(centerlineVector)
+          centerlineVector = (centerlineVector/centerlineNorm) * magnitudeDifference
+          if centerlineNorm == 0:
+            centerlineVector = np.array([0,0,0])
+          # combinedMatrix.SetElement(0,3,originalPoint[0]+nudgedVector[0]+originalVector[0])
+          # combinedMatrix.SetElement(1,3,originalPoint[1]+nudgedVector[1]+originalVector[1])
+          # combinedMatrix.SetElement(2,3,originalPoint[2]+nudgedVector[2]+originalVector[2])
+          combinedMatrix.SetElement(0,3,originalPoint[0]+nudgedVector[0]+centerlineVector[0])
+          combinedMatrix.SetElement(1,3,originalPoint[1]+nudgedVector[1]+centerlineVector[1])
+          combinedMatrix.SetElement(2,3,originalPoint[2]+nudgedVector[2]+centerlineVector[2])
 
           self.previousClosestPoint = closestPointTransformed
 
