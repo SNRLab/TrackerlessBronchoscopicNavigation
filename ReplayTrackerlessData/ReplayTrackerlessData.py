@@ -13,6 +13,7 @@ from PIL import Image
 from Resources import layers
 import re
 import json
+import time
 import cv2
 from scipy.spatial.transform import Rotation as R
 
@@ -53,6 +54,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.centerlineScaleFactor = 1.0
     self.centerlineStartRadius = 1.0
     self.numberOfFrames = 0
+    self.finished = False
 
   def cleanup(self):
     self.stepTimer.stop()
@@ -102,7 +104,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.stepModeCollapsibleButton)
 
     stepModeLayout = qt.QFormLayout(self.stepModeCollapsibleButton)
-    self.pathBox = qt.QLineEdit("D:/Partners HealthCare Dropbox/Franklin King/SNRLabDisk/Projects/CanonProj/TrackerlessNavigation/ExperimentResults/Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward")
+    self.pathBox = qt.QLineEdit("D:/Partners HealthCare Dropbox/Franklin King/SNRLabDisk/Projects/CanonProj/TrackerlessNavigation/ExperimentResults/Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3")
     self.pathBox.setReadOnly(False)
     self.pathButton = qt.QPushButton("...")
     self.pathButton.clicked.connect(self.select_directory)
@@ -459,6 +461,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.stepCount = self.stepStartOffsetBox.value
     self.stepLabel.setText(f'{self.stepStartOffsetBox.value}')
 
+    self.finished = False
+
     layoutManager = slicer.app.layoutManager()
     red = layoutManager.sliceWidget('Red')
     redLogic = red.sliceLogic()
@@ -612,6 +616,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     if self.stepCount+self.stepSkipBox.value >= self.numberOfFrames:
       self.stepTimerButton.setChecked(False)
       self.onStepTimer()
+      self.finished = True
       return
       
     self.stepLabel.setText(str(self.stepCount))
@@ -1293,3 +1298,192 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
     cellLocator.FindClosestPoint(point, closestPoint, cellId, subId, dist2)
     return closestPoint
+  
+class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
+
+  def setUp(self):
+    widget = ReplayTrackerlessDataWidget()
+    return widget
+  
+  def runTest(self):
+    slicer.util.selectModule('CurveMaker')
+    slicer.util.selectModule('CollectPoints')
+
+    basePath = "D:/Partners HealthCare Dropbox/Franklin King/SNRLabDisk/Projects/CanonProj/TrackerlessNavigation/ExperimentResults/"
+
+    # # Box Phantom 1
+    # dataPaths = [f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/BoxPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [22.85, 27.11, 20.49, 21.18]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 0.5, 1.5, 1.5]
+    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_1", "Initial_ICP_2", "Initial_ICP_3", "Initial_ICP_4"]
+    # fiducialListPoseOnly = ["D_1_PoseOnly", "D_2_PoseOnly", "D_3_PoseOnly", "D_4_PoseOnly"]
+    # fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_2_CenterCorrection", "D_3_CenterCorrection", "D_4_CenterCorrection"]
+
+    # # Box Phantom 2
+    # dataPaths = [f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/BoxPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [15.60, 15.49, 24.95, 20.03]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 0.5, 1.5, 1.5]
+    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_1", "Initial_ICP_2", "Initial_ICP_3", "Initial_ICP_4"]
+    # fiducialListPoseOnly = ["D_1_PoseOnly", "D_2_PoseOnly", "D_3_PoseOnly", "D_4_PoseOnly"]
+    # fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_2_CenterCorrection", "D_3_CenterCorrection", "D_4_CenterCorrection"] 
+
+    # # Full Phantom 2
+    # dataPaths = [f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/6/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/8/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/FullPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/8/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [18.33, 16.76, 24.75, 23.12, 17.02, 17.65, 20.48, 22.35]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
+    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_1", "Initial_ICP_2", "Initial_ICP_3", "Initial_ICP_4", "Initial_ICP_5", "Initial_ICP_6", "Initial_ICP_7", "Initial_ICP_8"]
+    # fiducialListPoseOnly = ["D_1_PoseOnly", "D_2_PoseOnly", "D_3_PoseOnly", "D_4_PoseOnly", "D_5_PoseOnly", "D_6_PoseOnly", "D_7_PoseOnly", "D_8_PoseOnly"]
+    # fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_2_CenterCorrection", "D_3_CenterCorrection", "D_4_CenterCorrection", "D_5_CenterCorrection", "D_6_CenterCorrection", "D_7_CenterCorrection", "D_8_CenterCorrection"] 
+
+    # Rigid Phantom 1
+    dataPaths = [f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+                 f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+                 f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+                 f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3"]
+    gtPaths = [f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+               f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+               f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+               f"{basePath}Validation/RigidPhantom1/Images/7/forward"]
+    stepSkips = [3, 3, 3, 3]
+    scaleFactors = [18.54, 14.63, 18.13, 19.84]
+    nudgeIntervals = [3, 3, 3, 3]
+    nudgeFactors = [0.5, 1.5, 0.5, 1.5]
+    nudgeRotationFactors = [0.5, 1.5, 0.5, 1.5]
+    initial_ICPs = ["Initial_ICP_1", "Initial_ICP_3", "Initial_ICP_5", "Initial_ICP_7"]
+    fiducialListPoseOnly = ["D_1_PoseOnly", "D_3_PoseOnly", "D_5_PoseOnly", "D_7_PoseOnly"]
+    fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_3_CenterCorrection", "D_5_CenterCorrection", "D_7_CenterCorrection"]             
+
+    self.delayDisplay("<h2>Clearing Previous Results</h2>")
+    for fiducialListName in fiducialListPoseOnly:
+      fiducialPoseOnlyNode = slicer.util.getNode(fiducialListName)
+      fiducialPoseOnlyNode.RemoveAllControlPoints()
+    for fiducialListName in fiducialListCenterCorrection:
+      fiducialCenterCorrectionNode = slicer.util.getNode(fiducialListName)
+      fiducialCenterCorrectionNode.RemoveAllControlPoints()
+
+    self.delayDisplay("<h2>Starting Replays</h2>")
+    for idx in range(len(dataPaths)):
+      self.runReplayModule(dataPaths[idx], gtPaths[idx], stepSkips[idx], scaleFactors[idx], nudgeIntervals[idx], nudgeFactors[idx], nudgeRotationFactors[idx], initial_ICPs[idx], fiducialListPoseOnly[idx], fiducialListCenterCorrection[idx])
+
+    self.delayDisplay("<h2>Drawing Paths</h2>")
+    curveMakerWidget = slicer.modules.curvemaker.widgetRepresentation()
+    sourceWidget = curveMakerWidget.children()[1].children()[2]
+    curveWidget = curveMakerWidget.children()[1].children()[4]
+    radiusWidget = curveMakerWidget.children()[1].children()[6]
+    generateCurveButton = curveMakerWidget.children()[1].children()[18]
+    for fiducialListName in fiducialListPoseOnly:
+      sourceWidget.setCurrentNode(slicer.util.getNode(fiducialListName))
+      curveWidget.setCurrentNode(slicer.util.getNode(fiducialListName+"_Curve"))
+      radiusWidget.value = 1
+      self.wait_without_blocking(0.05)
+      generateCurveButton.clicked()
+      self.wait_without_blocking(0.05)
+    for fiducialListName in fiducialListCenterCorrection:
+      sourceWidget.setCurrentNode(slicer.util.getNode(fiducialListName))
+      curveWidget.setCurrentNode(slicer.util.getNode(fiducialListName+"_Curve"))
+      radiusWidget.value = 1
+      generateCurveButton.clicked()
+
+    slicer.util.selectModule('ReplayTrackerlessData')
+
+  def runReplayModule(self, dataPath, gtPath, stepSkip, scaleFactor, nudgeInterval, nudgeFactor, nudgeRotationFactor, initial_ICP_name, fiducialPoseOnly, fiducialCenterCorrection):
+    widget = self.setUp()
+
+    poseNode = slicer.util.getNode("Pose")
+    initial_icp_node = slicer.util.getNode(initial_ICP_name)
+    fiducialPoseOnlyNode = slicer.util.getNode(fiducialPoseOnly)
+    fiducialCenterCorrectionNode = slicer.util.getNode(fiducialCenterCorrection)
+    poseNode.SetAndObserveTransformNodeID(initial_icp_node.GetID())
+    widget.pathBox.setText(dataPath)
+    widget.gtPathBox.setText(gtPath)
+    widget.stepSkipBox.value = stepSkip
+    widget.scaleSliderWidget.value = scaleFactor
+    widget.nudgeInterval.value = nudgeInterval
+    widget.nudgeFactorWidget.value = nudgeFactor
+    widget.nudgeRotationFactorWidget.value = nudgeRotationFactor
+
+    self.delayDisplay(f"<h1>Starting Replay: {fiducialPoseOnly}</h1>")
+    widget.methodComboBox.setCurrentIndex(0)
+    widget.onAutoInputs()
+    widget.onLoadPred()
+    widget.onResetStepCount()
+
+    collectPointsWidget = slicer.modules.collectpoints.widgetRepresentation()
+    collectPointsWidget.SamplingTransformNodeComboBox.setCurrentNodeID(poseNode.GetID())
+    collectPointsWidget.OutputNodeComboBox.setCurrentNodeID(fiducialPoseOnlyNode.GetID())
+    collectPointsWidget.CollectButton.clicked()
+
+    while True:
+      self.wait_without_blocking(0.01)
+      widget.stepButton.clicked()
+      self.wait_without_blocking(0.01)
+      if widget.finished:
+        break
+      collectPointsWidget.CollectButton.clicked()
+
+    self.delayDisplay(f"<h1>Starting Replay: {fiducialCenterCorrection}</h1>")
+    widget.methodComboBox.setCurrentIndex(1)
+    widget.onAutoInputs()
+    widget.onLoadPred()
+    widget.onResetStepCount()
+
+    collectPointsWidget = slicer.modules.collectpoints.widgetRepresentation()
+    collectPointsWidget.SamplingTransformNodeComboBox.setCurrentNodeID(poseNode.GetID())
+    collectPointsWidget.OutputNodeComboBox.setCurrentNodeID(fiducialCenterCorrectionNode.GetID())
+    collectPointsWidget.CollectButton.clicked()
+
+    while True:
+      self.wait_without_blocking(0.01)
+      widget.stepButton.clicked()
+      self.wait_without_blocking(0.01)
+      if widget.finished:
+        break
+      collectPointsWidget.CollectButton.clicked()    
+
+    widget.cleanup()
+    widget.parent.deleteLater()      
+
+  def wait_without_blocking(self, timeout=10):
+    start_time = time.time()
+    while True:
+      slicer.app.processEvents()
+      if time.time() - start_time > timeout:
+        break
