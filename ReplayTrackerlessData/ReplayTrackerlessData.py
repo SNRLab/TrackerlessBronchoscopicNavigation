@@ -1312,17 +1312,7 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
 
     basePath = "G:/Partners HealthCare Dropbox/Franklin King/SNRLabDisk/Projects/CanonProj/TrackerlessNavigation/ExperimentResults/"
 
-    self.delayDisplay("<h2>Clearing Previous Results</h2>")
-    for fiducialListName in fiducialList:
-      fiducialPoseOnlyNode = slicer.util.getNode(fiducialListName)
-      fiducialPoseOnlyNode.RemoveAllControlPoints()
 
-    self.delayDisplay("<h2>Starting Curves</h2>")
-    for idx in range(len(dataPaths)):
-      self.runCurveModule(dataPaths[idx], gtPaths[idx], stepSkips, scaleFactors, "Initial_ICP_I", fiducialList[idx], stepStartOffset)
-
-    slicer.util.selectModule('ReplayTrackerlessData')    
-  
   # # for replaying data
   # def runTest(self):
   #   slicer.util.selectModule('CurveMaker')
@@ -1415,17 +1405,17 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
   #   # stepStartOffset = 1
 
 
-  #   self.delayDisplay("<h2>Clearing Previous Results</h2>")
-  #   for fiducialListName in fiducialListPoseOnly:
-  #     fiducialPoseOnlyNode = slicer.util.getNode(fiducialListName)
-  #     fiducialPoseOnlyNode.RemoveAllControlPoints()
-  #   for fiducialListName in fiducialListCenterCorrection:
-  #     fiducialCenterCorrectionNode = slicer.util.getNode(fiducialListName)
-  #     fiducialCenterCorrectionNode.RemoveAllControlPoints()
+    self.delayDisplay("<h2>Clearing Previous Results</h2>")
+    for fiducialListName in fiducialListPoseOnly:
+      fiducialPoseOnlyNode = slicer.util.getNode(fiducialListName)
+      fiducialPoseOnlyNode.RemoveAllControlPoints()
+    for fiducialListName in fiducialListCenterCorrection:
+      fiducialCenterCorrectionNode = slicer.util.getNode(fiducialListName)
+      fiducialCenterCorrectionNode.RemoveAllControlPoints()
 
-  #   self.delayDisplay("<h2>Starting Replays</h2>")
-  #   for idx in range(len(dataPaths)):
-  #     self.runReplayModule(dataPaths[idx], gtPaths[idx], stepSkips[idx], scaleFactors[idx], nudgeIntervals[idx], nudgeFactors[idx], nudgeRotationFactors[idx], initial_ICPs[idx], fiducialListPoseOnly[idx], fiducialListCenterCorrection[idx], stepStartOffset)
+    self.delayDisplay("<h2>Starting Replays</h2>")
+    for idx in range(len(dataPaths)):
+      self.runReplayModule(dataPaths[idx], gtPaths[idx], stepSkips[idx], scaleFactors[idx], nudgeIntervals[idx], nudgeFactors[idx], nudgeRotationFactors[idx], initial_ICPs[idx], fiducialListPoseOnly[idx], fiducialListCenterCorrection[idx], stepStartOffset)
 
   #   # self.delayDisplay("<h2>Drawing Paths</h2>")
   #   # curveMakerWidget = slicer.modules.curvemaker.widgetRepresentation()
@@ -1446,7 +1436,7 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
   #   #   radiusWidget.value = 1
   #   #   generateCurveButton.clicked()
 
-  #   slicer.util.selectModule('ReplayTrackerlessData')
+    slicer.util.selectModule('ReplayTrackerlessData')
 
   def runReplayModule(self, dataPath, gtPath, stepSkip, scaleFactor, nudgeInterval, nudgeFactor, nudgeRotationFactor, initial_ICP_name, fiducialPoseOnly, fiducialCenterCorrection, stepStartOffset=1):
     widget = self.setUp()
