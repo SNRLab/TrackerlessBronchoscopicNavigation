@@ -1,0 +1,317 @@
+# Curves:
+    # # Box Phantom 1
+    # dataPaths = [f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/BoxPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward"]
+    # stepSkips = 3
+    # scaleFactors = 1.0
+    # fiducialList = ["B_1_Curve", "B_2_Curve", "B_3_Curve", "B_4_Curve", "C_1_Curve", "C_2_Curve", "C_3_Curve", "C_4_Curve", "D_1_Curve", "D_2_Curve", "D_3_Curve", "D_4_Curve", "E_1_Curve", "E_2_Curve", "E_3_Curve", "E_4_Curve", "G_1_Curve", "G_2_Curve", "G_3_Curve", "G_4_Curve"]
+
+    # # Box Phantom 2
+    # dataPaths = [f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/BoxPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward"]
+    # stepSkips = 3
+    # scaleFactors = 1.0
+    # fiducialList = ["B_1_Curve", "B_2_Curve", "B_3_Curve", "B_4_Curve", "C_1_Curve", "C_2_Curve", "C_3_Curve", "C_4_Curve", "D_1_Curve", "D_2_Curve", "D_3_Curve", "D_4_Curve", "E_1_Curve", "E_2_Curve", "E_3_Curve", "E_4_Curve", "G_1_Curve", "G_2_Curve", "G_3_Curve", "G_4_Curve"]
+    # stepStartOffset = 1
+
+    # # Full Phantom 2
+    # dataPaths = [f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/6/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/8/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/6/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/8/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/6/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/8/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/6/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/8/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/6/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/8/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/FullPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/8/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/8/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/8/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/8/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/8/forward"]
+    # stepSkips = 3
+    # scaleFactors = 1.0
+    # fiducialList = ["B_1_Curve", "B_2_Curve", "B_3_Curve", "B_4_Curve", "B_5_Curve", "B_6_Curve", "B_7_Curve", "B_8_Curve", "C_1_Curve", "C_2_Curve", "C_3_Curve", "C_4_Curve", "C_5_Curve", "C_6_Curve", "C_7_Curve", "C_8_Curve", "D_1_Curve", "D_2_Curve", "D_3_Curve", "D_4_Curve", "D_5_Curve", "D_6_Curve", "D_7_Curve", "D_8_Curve", "E_1_Curve", "E_2_Curve", "E_3_Curve", "E_4_Curve", "E_5_Curve", "E_6_Curve", "E_7_Curve", "E_8_Curve", "G_1_Curve", "G_2_Curve", "G_3_Curve", "G_4_Curve", "G_5_Curve", "G_6_Curve", "G_7_Curve", "G_8_Curve"]
+    # stepStartOffset = 100
+
+    # # Rigid Phantom 1
+    # dataPaths = [f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward"]
+    # stepSkips = 3
+    # scaleFactors = 1.0
+    # fiducialList = ["B_1_Curve", "B_3_Curve", "B_5_Curve", "B_7_Curve", "C_1_Curve", "C_3_Curve", "C_5_Curve", "C_7_Curve", "D_1_Curve", "D_3_Curve", "D_5_Curve", "D_7_Curve", "E_1_Curve", "E_3_Curve", "E_5_Curve", "E_7_Curve", "G_1_Curve", "G_3_Curve", "G_5_Curve", "G_7_Curve"]
+    # stepStartOffset = 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # # A_cGAN
+    # # Box Phantom 1
+    # dataPaths = [f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/1",
+    #              f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/2",
+    #              f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/3",
+    #              f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/4"]
+    # gtPaths = [f"{basePath}Validation/BoxPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [22.85, 27.11, 20.49, 21.18]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 0.5, 1.5, 1.5]
+    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
+    # fiducialListPoseOnly = ["A_1", "A_2", "A_3", "A_4"]
+    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A"]
+
+    # # Box Phantom 2
+    # dataPaths = [f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/1",
+    #              f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/2",
+    #              f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/3",
+    #              f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/4"]
+    # gtPaths = [f"{basePath}Validation/BoxPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [15.60, 15.49, 24.95, 20.03]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 0.5, 1.5, 1.5]
+    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
+    # fiducialListPoseOnly = ["A_1", "A_2", "A_3", "A_4"]
+    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A"] 
+
+    # # Full Phantom 2
+    # dataPaths = [f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/1",
+    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/2",
+    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/3",
+    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/4",
+    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/5",
+    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/6",
+    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/7",
+    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/8"]
+    # gtPaths = [f"{basePath}Validation/FullPhantom2/Images/1/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
+    #            f"{basePath}Validation/FullPhantom2/Images/8/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [18.33, 16.76, 24.75, 23.12, 17.02, 17.65, 20.48, 22.35]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
+    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
+    # fiducialListPoseOnly = ["A_1", "A_2", "A_3", "A_4", "A_5", "A_6", "A_7", "A_8"]
+    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"] 
+
+    # # Rigid Phantom 1
+    # dataPaths = [f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/1",
+    #              f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/3",
+    #              f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/5",
+    #              f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/7"]
+    # gtPaths = [f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [18.54, 14.63, 18.13, 19.84]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 1.5, 0.5, 1.5]
+    # nudgeRotationFactors = [0.5, 1.5, 0.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
+    # fiducialListPoseOnly = ["A_1", "A_3", "A_5", "A_7"]
+    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A"]    

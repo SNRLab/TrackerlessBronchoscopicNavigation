@@ -193,6 +193,10 @@ class TrajectoryAnalysisWidget(ScriptedLoadableModuleWidget):
     self.calculateDistancesButton = qt.QPushButton("Calculate Distances")
     DistanceLayout.addRow(self.calculateDistancesButton)
     self.calculateDistancesButton.connect('clicked()', self.onCalculateDistances)
+    
+    self.calculateLabelDistancesButton = qt.QPushButton("Calculate Label Distances")
+    DistanceLayout.addRow(self.calculateLabelDistancesButton)
+    self.calculateLabelDistancesButton.connect('clicked()', self.onCalculateLabelDistances)    
 
     self.LabelCalculationCollapsibleButton = ctk.ctkCollapsibleButton()
     self.LabelCalculationCollapsibleButton.text = "Label Calculation"
@@ -288,6 +292,39 @@ class TrajectoryAnalysisWidget(ScriptedLoadableModuleWidget):
               self.write_distances(listA, listB, filename, skip=self.stepSkipBox.value)
             else:
               print(f'Skipped {Path}')
+              
+
+  def onCalculateLabelDistances(self):
+    gtText = self.gtTextBox.toPlainText()
+    GT_Paths = gtText.split("\n")
+    dataText = self.dataTextBox.toPlainText()
+    Paths = dataText.split("\n")
+
+    for GT_Path in GT_Paths:
+      try: 
+        gt_node = slicer.util.getNode(f'{GT_Path}_ClosestCenterline')
+      except:
+        gt_node = None
+
+      listA = self.get_fiducials(gt_node)
+      
+      if len(listA) > 0:
+        print(f'GT: {gt_node.GetName()}')
+
+        for Path in Paths:
+          if int(Path.split('_')[1]) == int(GT_Path.split('_')[1]):
+            try: 
+              node = slicer.util.getNode(f'{Path}_ClosestCenterline')
+            except:
+              node = None
+            listB = self.get_fiducials(node)
+
+            if len(listB) > 0:
+              print(f'Writing {Path}')
+              filename = f'{GT_Path}-{Path}-LabelDistance.csv'
+              self.write_distances(listA, listB, filename, skip=self.stepSkipBox.value)
+            else:
+              print(f'Skipped {Path}')              
 
 
   def findClosestPointOnLine(self, pathNode, point):

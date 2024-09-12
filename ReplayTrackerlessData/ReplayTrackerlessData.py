@@ -289,8 +289,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.cornerCutBox.setMaximum(100)
     self.cornerCutBox.setMinimum(0)
     self.cornerCutBox.setSuffix(" px")
-    self.cornerCutBox.value = 1
-    self.cornerCutBox.setEnabled(False)
+    self.cornerCutBox.value = 40
+    self.cornerCutBox.setEnabled(True)
     depthMapModeLayout.addRow("Corner size to cut:", self.cornerCutBox)
 
     self.borderCutBox = qt.QSpinBox()
@@ -298,8 +298,8 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.borderCutBox.setMaximum(100)
     self.borderCutBox.setMinimum(0)
     self.borderCutBox.setSuffix(" px")
-    self.borderCutBox.value = 1
-    self.borderCutBox.setEnabled(False)
+    self.borderCutBox.value = 40
+    self.borderCutBox.setEnabled(True)
     depthMapModeLayout.addRow("Border size to cut:", self.borderCutBox)    
 
     self.focalLengthBox = ctk.ctkDoubleSpinBox()
@@ -312,13 +312,13 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.imageScaleBox = ctk.ctkDoubleSpinBox()
     self.imageScaleBox.maximum = 100000.0
     self.imageScaleBox.minimum = 0.0
-    self.imageScaleBox.setValue(150.0)
+    self.imageScaleBox.setValue(17.00)
     depthMapModeLayout.addRow("Base Image Scale: ", self.imageScaleBox)
 
     self.depthScaleBox = ctk.ctkDoubleSpinBox()
     self.depthScaleBox.maximum = 100000.0
     self.depthScaleBox.minimum = 0.0
-    self.depthScaleBox.setValue(150.0)
+    self.depthScaleBox.setValue(17.00)
     depthMapModeLayout.addRow("Base Depth Scale: ", self.depthScaleBox)
 
     self.thresholdBox = qt.QSpinBox()
@@ -326,7 +326,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.thresholdBox.setMaximum(100)
     self.thresholdBox.setMinimum(0)
     self.thresholdBox.setSuffix("%")
-    self.thresholdBox.value = 60
+    self.thresholdBox.value = 90
     depthMapModeLayout.addRow("Threshold:", self.thresholdBox)
 
     # ICP collapsible button
@@ -351,7 +351,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.icpMethodComboBox = qt.QComboBox()
     self.icpMethodComboBox.addItem('Similarity')
     self.icpMethodComboBox.addItem('Rigid')
-    self.icpMethodComboBox.setCurrentIndex(0)
+    self.icpMethodComboBox.setCurrentIndex(1)
     icpLayout.addRow('ICP Method:', self.icpMethodComboBox)
 
     self.checkMeanDistanceCheckBox = qt.QCheckBox("Check Mean Distance")
@@ -382,6 +382,14 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.icpMaxDistanceSlider.value = 0.01
     icpLayout.addRow("Maximum of Distance:", self.icpMaxDistanceSlider)
 
+    self.icpcGANPushSlider = ctk.ctkSliderWidget()
+    self.icpcGANPushSlider.decimals = 2
+    self.icpcGANPushSlider.singleStep = 0.1
+    self.icpcGANPushSlider.minimum = 0.0
+    self.icpcGANPushSlider.maximum = 1000.0
+    self.icpcGANPushSlider.value = 5.0
+    icpLayout.addRow("ICP cGAN Push:", self.icpcGANPushSlider)    
+
     self.initialICPButton = qt.QPushButton("Initialization ICP")
     icpLayout.addRow(self.initialICPButton)
     self.initialICPButton.connect('clicked()', self.onInitializationICP)
@@ -399,7 +407,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     self.layout.addStretch(1)
 
   def onAutoInputs(self):
-    #self.imageSelector.setCurrentNode(slicer.util.getNode('0000000001'))
+    #self.imageSelector.setCurrentNode(slicer.util.getNode('RGB_1'))
     self.inputTransformSelector.setCurrentNode(slicer.util.getNode('Pose'))
     #self.pointCloudSelector.setCurrentNode(slicer.util.getNode('PointCloud'))
     self.centerlineSelector.setCurrentNode(slicer.util.getNode('CenterlineModel'))
@@ -465,6 +473,10 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       startTransformNode = slicer.util.getNode("Start")
       startTransformNode.SetAndObserveMatrixTransformToParent(matrix)
 
+    if self.pointCloudSelector.currentNode():
+      self.createPointCloud(str(self.stepCount), None, True)
+
+
     if self.cameraAirwayPositionSelector.currentNode() and self.centerlineSelector.currentNode() and self.centerlineScalingCheckBox.isChecked():
       closestRadius = self.calculateClosestCenterlineRadius()
       self.centerlineStartRadius = closestRadius
@@ -509,7 +521,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       print(f'Missing poses')
 
 
-  def createPointCloud(self, stepCountString, maskImage):
+  def createPointCloud(self, stepCountString, maskImage, usePointCloudReg = False):
     suffix = "_depth.npy"
     depthMapFilename = ""
     for filename in os.listdir(self.pathBox.text):
@@ -529,9 +541,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       maskImage = cv2.imread(f'{self.pathBox.text}/{maskFilename}')
       maskImage = cv2.cvtColor(maskImage, cv2.COLOR_BGR2GRAY)
     if self.imageSelector.currentNode():
-      self.depthMapToPointCloud(depthMap, slicer.util.arrayFromVolume(self.imageSelector.currentNode())[self.stepCount], maskImage)
+      self.depthMapToPointCloud(depthMap, slicer.util.arrayFromVolume(self.imageSelector.currentNode())[self.stepCount], maskImage, usePointCloudReg)
     else:
-      self.depthMapToPointCloud(depthMap, None, maskImage)
+      self.depthMapToPointCloud(depthMap, None, maskImage, usePointCloudReg)
 
   def adjustSliceOffset(self):
     layoutManager = slicer.app.layoutManager()
@@ -634,7 +646,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # ------------------------------ Recorded Pose ------------------------------
     elif self.methodComboBox.currentText == "Recorded AI Pose":
       if self.pointCloudSelector.currentNode():
-        self.createPointCloud(stepCountString, maskImage)
+        self.createPointCloud(stepCountString, maskImage, True)
           
       # Display image by moving slice offset
       self.adjustSliceOffset()
@@ -645,7 +657,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
-      previousNpMatrix = self.vtk_to_numpy_matrix(previousMatrix) / scale
       step = ((self.stepCount-1-self.stepSkipBox.value) // self.stepSkipBox.value)+1
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
@@ -661,7 +672,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # ------------------------------ ICP with Pose ------------------------------
     elif self.methodComboBox.currentText == "Recorded AI Pose with Nudge":
       if self.pointCloudSelector.currentNode():
-        self.createPointCloud(stepCountString, maskImage)
+        self.createPointCloud(stepCountString, maskImage, True)
           
       # Display image by moving slice offset
       self.adjustSliceOffset()
@@ -768,17 +779,26 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     # ------------------------------ ICP with Pose ------------------------------
     elif self.methodComboBox.currentText == "Recorded AI Pose with ICP":
       if self.pointCloudSelector.currentNode():
-        self.createPointCloud(stepCountString, maskImage)
+        self.createPointCloud(stepCountString, maskImage, True)
           
       # Display image by moving slice offset
       self.adjustSliceOffset()
+
+      previousMatrix = vtk.vtkMatrix4x4()
+      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
+
+      # Start ICP:
+      if ((self.stepCount-1) % self.nudgeInterval.value) == 0 and self.stepCount != 1:
+        icpMatrix = self.calculateICPTransform2()   
+
+        combinedICPMatrix = vtk.vtkMatrix4x4()
+        combinedICPMatrix.Multiply4x4(previousMatrix, icpMatrix, combinedICPMatrix)
+        self.nudgeLabel.text = f'ICP performed'
 
       # Start AI Pose:
       scale = self.scaleSliderWidget.value
       rotationScale = self.rotationScaleSliderWidget.value
 
-      previousMatrix = vtk.vtkMatrix4x4()
-      self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
       step = ((self.stepCount-1-self.stepSkipBox.value) // self.stepSkipBox.value)+1
       pred_pose = self.get_transform(torch.from_numpy(self.euler_angle_pred['a'][step-1:step, 0]), torch.from_numpy(self.translations_pred['a'][step-1:step, 0]), scale, rotationScale)
 
@@ -787,32 +807,9 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       predMatrix.Invert()
 
       combinedMatrix = vtk.vtkMatrix4x4()
-      combinedMatrix.Multiply4x4(previousMatrix, predMatrix, combinedMatrix)
+      combinedMatrix.Multiply4x4(combinedICPMatrix, predMatrix, combinedMatrix)
 
       self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
-
-      # Start ICP:
-      if ((self.stepCount-1) % self.nudgeInterval.value) == 0 and self.stepCount != 1:
-        icpMatrix = self.calculateICPTransform()   
-
-        # print(icpMatrix)
-
-        # inverseParentMatrix = vtk.vtkMatrix4x4()
-        # self.inputTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToWorld(inverseParentMatrix)
-        # inverseParentMatrix.Invert()   
-
-        # icpMatrixTransformed = vtk.vtkMatrix4x4()
-        # icpMatrixTransformed.Multiply4x4(inverseParentMatrix, icpMatrix, icpMatrixTransformed)
-
-        # print(icpMatrixTransformed)
-
-        nudgedMatrix = vtk.vtkMatrix4x4()
-        self.inputTransformSelector.currentNode().GetMatrixTransformToParent(nudgedMatrix)
-        combinedIcpMatrix = vtk.vtkMatrix4x4()
-        nudgedMatrix.Multiply4x4(icpMatrix, nudgedMatrix, combinedIcpMatrix)
-        self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedIcpMatrix)
-
-        self.nudgeLabel.text = f'ICP performed'
     # ------------------------------ ICP with Pose ------------------------------
     elif self.methodComboBox.currentText == "cGAN with ICP":
       if self.pointCloudSelector.currentNode():
@@ -827,24 +824,23 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
       previousMatrix = vtk.vtkMatrix4x4()
       self.inputTransformSelector.currentNode().GetMatrixTransformToParent(previousMatrix)
 
-      # Start ICP:
-      #self.surfaceRegistration()
-      icpMatrix = self.calculateICPTransform()
+
+      icpMatrix = self.calculateICPTransform2()
       #icpMatrix = self.remove_scaling(icpMatrix)
 
-      # # Apply inverse of the initialization transform
-      # inverseParentMatrix = vtk.vtkMatrix4x4()
-      # self.inputTransformSelector.currentNode().GetParentTransformNode().GetMatrixTransformToWorld(inverseParentMatrix)
-      # inverseParentMatrix.Invert()
-      # icpMatrix.Multiply4x4(inverseParentMatrix, icpMatrix, icpMatrix)
+      combinedMatrix = vtk.vtkMatrix4x4()
+      combinedMatrix.Multiply4x4(previousMatrix, icpMatrix, combinedMatrix)
 
-      # combinedMatrix = vtk.vtkMatrix4x4()
-      # combinedMatrix.Multiply4x4(previousMatrix, icpMatrix, combinedMatrix)
+      # Force it to move forwards a little bit
+      icpVector = [0,0,1,1]
+      rotationMatrix = self.getRotationMatrixfromMatrix(previousMatrix)
+      rotationMatrix.MultiplyPoint(icpVector, icpVector)
+      icpVector = np.array(icpVector[:3])
+      icpVectorNorm = np.linalg.norm(icpVector)
+      icpVector = (icpVector/icpVectorNorm) * self.icpcGANPushSlider.value
+      combinedMatrix.SetElement(0,3,combinedMatrix.GetElement(0,3)+icpVector[0]); combinedMatrix.SetElement(1,3,combinedMatrix.GetElement(1,3)+icpVector[1]); combinedMatrix.SetElement(2,3,combinedMatrix.GetElement(2,3)+icpVector[2])
 
-      cGAN_ICP_node = slicer.util.getNode("ICP_cGAN")
-      cGAN_ICP_node.SetAndObserveMatrixTransformToParent(icpMatrix)
-
-      #self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(icpMatrix)
+      self.inputTransformSelector.currentNode().SetAndObserveMatrixTransformToParent(combinedMatrix)
 
       self.nudgeLabel.text = f'ICP performed'
 
@@ -856,19 +852,6 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
         self.centerlineScaleLabel.text = f'{self.centerlineScaleFactor:.2f}'
     else:
       self.centerlineScaleFactor = 1.0
-
-  def surfaceRegistration(self):
-    surfaceRegistration = slicer.modules.surfaceregistration.widgetRepresentation().self()
-    surfaceRegistration.inputFixedModelSelector.currentNodeID = self.baseModelSelector.currentNodeID
-    surfaceRegistration.inputMovingModelSelector.currentNodeID = self.pointCloudSelector.currentNodeID
-    cGAN_ICP_node = slicer.util.getNode("ICP_cGAN")
-    surfaceRegistration.outputTransformSelector.currentNodeID = cGAN_ICP_node.GetID()
-    surfaceRegistration.landmarkTransformTypeButtonsSimilarity.checked = True
-    surfaceRegistration.checkMeanDistance.setChecked(True)
-    surfaceRegistration.numberOfIterations.setValue(int(self.icpIterationsSlider.value))
-    surfaceRegistration.numberOfLandmarks.setValue(int(self.icpLandmarksSlider.value))
-    surfaceRegistration.maxDistance.value = 0.01
-    surfaceRegistration.onComputeButton()
 
   def remove_scaling(self, matrix):
     # Extract the scaling factors
@@ -1016,7 +999,7 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     matrix.SetElement(1,2, (yz - wx) * 2)
     matrix.SetElement(2,2, zz * 2 + s)
 
-  def depthMapToPointCloud(self, depthImage, rgbImage, maskImage = None):
+  def depthMapToPointCloud(self, depthImage, rgbImage, maskImage = None, usePointCloudReg = False):
     height = len(depthImage)
     width = len(depthImage[0])
 
@@ -1087,6 +1070,18 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
 
     if colorArray:
       polydata.GetPointData().SetScalars(colorArray)
+
+    if usePointCloudReg:
+      pointCloudRegTransform = vtk.vtkTransform()
+      pointCloudRegMatrix = vtk.vtkMatrix4x4()
+      pointCloudRegNode = slicer.util.getNode("PointCloudReg")
+      pointCloudRegNode.GetMatrixTransformToParent(pointCloudRegMatrix)
+      pointCloudRegTransform.SetMatrix(pointCloudRegMatrix)
+      pointCloudRegTransformFilter = vtk.vtkTransformPolyDataFilter()
+      pointCloudRegTransformFilter.SetInputData(polydata)
+      pointCloudRegTransformFilter.SetTransform(pointCloudRegTransform)
+      pointCloudRegTransformFilter.Update()
+      polydata = pointCloudRegTransformFilter.GetOutput()      
 
     # Display the point cloud
     modelNode = self.pointCloudSelector.currentNode()
@@ -1195,6 +1190,76 @@ class ReplayTrackerlessDataWidget(ScriptedLoadableModuleWidget):
     icp.GetMatrix(outputMatrix)
     return outputMatrix
 
+
+  def calculateICPTransform2(self):
+    #outputTrans = self.icpTransformSelector.currentNode()
+
+    fixedModel = self.baseModelSelector.currentNode()
+    movingModel = self.pointCloudSelector.currentNode()
+
+    # Harden models
+    # Move the fixed model into the initialized coordinate system
+    fixedPolyData = vtk.vtkPolyData()
+    fixedPolyData.DeepCopy(fixedModel.GetPolyData())
+
+    inverseParentMatrix = vtk.vtkMatrix4x4()
+    movingModel.GetParentTransformNode().GetMatrixTransformToWorld(inverseParentMatrix)
+
+    # # Force it to move forwards a little bit
+    # icpVector = [0,0,1,1]
+    # rotationMatrix = self.getRotationMatrixfromMatrix(inverseParentMatrix)
+    # rotationMatrix.MultiplyPoint(icpVector, icpVector)
+    # icpVector = np.array(icpVector[:3])
+    # icpVectorNorm = np.linalg.norm(icpVector)
+    # icpVector = (icpVector/icpVectorNorm) * -50
+    # print(icpVector)
+    # inverseParentMatrix.SetElement(0,3,inverseParentMatrix.GetElement(0,3)+icpVector[0]); inverseParentMatrix.SetElement(1,3,inverseParentMatrix.GetElement(1,3)+icpVector[1]); inverseParentMatrix.SetElement(2,3,inverseParentMatrix.GetElement(2,3)+icpVector[2])
+
+    #inverseParentMatrix = self.remove_scaling(inverseParentMatrix)
+    inverseParentMatrix.Invert()
+    inverseParentTransform = vtk.vtkTransform()
+    inverseParentTransform.SetMatrix(inverseParentMatrix)
+    inverseParentTransformFilter = vtk.vtkTransformPolyDataFilter()
+    inverseParentTransformFilter.SetInputData(fixedPolyData)
+    inverseParentTransformFilter.SetTransform(inverseParentTransform)
+    inverseParentTransformFilter.Update()
+    fixedPolyData = inverseParentTransformFilter.GetOutput()
+
+    hardenedFixedModelNode = slicer.vtkMRMLModelNode()
+    slicer.mrmlScene.AddNode(hardenedFixedModelNode)
+    hardenedFixedModelNode.SetName("Fixed")
+    hardenedFixedModelNode.SetAndObservePolyData(fixedPolyData)
+
+    hardenedMovingModelNode = slicer.vtkMRMLModelNode()
+    slicer.mrmlScene.AddNode(hardenedMovingModelNode)
+    hardenedMovingModelNode.SetName("Moving")
+    movingPolyData = vtk.vtkPolyData()
+    movingPolyData.DeepCopy(movingModel.GetPolyData())
+    hardenedMovingModelNode.SetAndObservePolyData(movingPolyData)
+
+    icp = vtk.vtkIterativeClosestPointTransform()
+    icp.SetSource(movingPolyData)
+    icp.SetTarget(fixedPolyData)
+    if self.icpMethodComboBox.currentText == "Similarity":
+      icp.GetLandmarkTransform().SetModeToSimilarity()
+    elif self.icpMethodComboBox.currentText == "Rigid":
+      icp.GetLandmarkTransform().SetModeToRigidBody()
+    icp.SetMeanDistanceModeToAbsoluteValue()
+    icp.SetMaximumNumberOfIterations(int(self.icpIterationsSlider.value))
+    icp.SetMaximumMeanDistance(self.icpMaxDistanceSlider.value)
+    icp.SetMaximumNumberOfLandmarks(int(self.icpLandmarksSlider.value))
+    icp.SetCheckMeanDistance(int(self.checkMeanDistanceCheckBox.isChecked()))
+    icp.StartByMatchingCentroidsOff()
+    icp.Update()
+
+    slicer.mrmlScene.RemoveNode(hardenedFixedModelNode)
+    slicer.mrmlScene.RemoveNode(hardenedMovingModelNode)
+
+    outputMatrix = vtk.vtkMatrix4x4()
+    icp.GetMatrix(outputMatrix)
+    return outputMatrix
+
+
   def calculateClosestCenterlineRadius(self):
     radiusCenterlineNode = self.centerlineSelector.currentNode()
     currentMatrix = vtk.vtkMatrix4x4()
@@ -1246,230 +1311,6 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
     slicer.util.selectModule('CollectPoints')
 
     basePath = "G:/Partners HealthCare Dropbox/Franklin King/SNRLabDisk/Projects/CanonProj/TrackerlessNavigation/ExperimentResults/"
-
-    # # Box Phantom 1
-    # dataPaths = [f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3"]
-    # gtPaths = [f"{basePath}Validation/BoxPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward"]
-    # stepSkips = 3
-    # scaleFactors = 1.0
-    # fiducialList = ["B_1_Curve", "B_2_Curve", "B_3_Curve", "B_4_Curve", "C_1_Curve", "C_2_Curve", "C_3_Curve", "C_4_Curve", "D_1_Curve", "D_2_Curve", "D_3_Curve", "D_4_Curve", "E_1_Curve", "E_2_Curve", "E_3_Curve", "E_4_Curve", "G_1_Curve", "G_2_Curve", "G_3_Curve", "G_4_Curve"]
-
-    # # Box Phantom 2
-    # dataPaths = [f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/BoxPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3"]
-    # gtPaths = [f"{basePath}Validation/BoxPhantom2/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward"]
-    # stepSkips = 3
-    # scaleFactors = 1.0
-    # fiducialList = ["B_1_Curve", "B_2_Curve", "B_3_Curve", "B_4_Curve", "C_1_Curve", "C_2_Curve", "C_3_Curve", "C_4_Curve", "D_1_Curve", "D_2_Curve", "D_3_Curve", "D_4_Curve", "E_1_Curve", "E_2_Curve", "E_3_Curve", "E_4_Curve", "G_1_Curve", "G_2_Curve", "G_3_Curve", "G_4_Curve"]
-    stepStartOffset = 1
-
-    # Full Phantom 2
-    dataPaths = [f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/6/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/7/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/8/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/6/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/8/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/6/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/8/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/2/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/4/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/6/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/8/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/6/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
-                 f"{basePath}Model_Results/FullPhantom2/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/8/forward/frequency_3"]
-    gtPaths = [f"{basePath}Validation/FullPhantom2/Images/1/forward",
-               f"{basePath}Validation/FullPhantom2/Images/2/forward",
-               f"{basePath}Validation/FullPhantom2/Images/3/forward",
-               f"{basePath}Validation/FullPhantom2/Images/4/forward",
-               f"{basePath}Validation/FullPhantom2/Images/5/forward",
-               f"{basePath}Validation/FullPhantom2/Images/6/forward",
-               f"{basePath}Validation/FullPhantom2/Images/7/forward",
-               f"{basePath}Validation/FullPhantom2/Images/8/forward",
-               f"{basePath}Validation/FullPhantom2/Images/1/forward",
-               f"{basePath}Validation/FullPhantom2/Images/2/forward",
-               f"{basePath}Validation/FullPhantom2/Images/3/forward",
-               f"{basePath}Validation/FullPhantom2/Images/4/forward",
-               f"{basePath}Validation/FullPhantom2/Images/5/forward",
-               f"{basePath}Validation/FullPhantom2/Images/6/forward",
-               f"{basePath}Validation/FullPhantom2/Images/7/forward",
-               f"{basePath}Validation/FullPhantom2/Images/8/forward",
-               f"{basePath}Validation/FullPhantom2/Images/1/forward",
-               f"{basePath}Validation/FullPhantom2/Images/2/forward",
-               f"{basePath}Validation/FullPhantom2/Images/3/forward",
-               f"{basePath}Validation/FullPhantom2/Images/4/forward",
-               f"{basePath}Validation/FullPhantom2/Images/5/forward",
-               f"{basePath}Validation/FullPhantom2/Images/6/forward",
-               f"{basePath}Validation/FullPhantom2/Images/7/forward",
-               f"{basePath}Validation/FullPhantom2/Images/8/forward",
-               f"{basePath}Validation/FullPhantom2/Images/1/forward",
-               f"{basePath}Validation/FullPhantom2/Images/2/forward",
-               f"{basePath}Validation/FullPhantom2/Images/3/forward",
-               f"{basePath}Validation/FullPhantom2/Images/4/forward",
-               f"{basePath}Validation/FullPhantom2/Images/5/forward",
-               f"{basePath}Validation/FullPhantom2/Images/6/forward",
-               f"{basePath}Validation/FullPhantom2/Images/7/forward",
-               f"{basePath}Validation/FullPhantom2/Images/8/forward",
-               f"{basePath}Validation/FullPhantom2/Images/1/forward",
-               f"{basePath}Validation/FullPhantom2/Images/2/forward",
-               f"{basePath}Validation/FullPhantom2/Images/3/forward",
-               f"{basePath}Validation/FullPhantom2/Images/4/forward",
-               f"{basePath}Validation/FullPhantom2/Images/5/forward",
-               f"{basePath}Validation/FullPhantom2/Images/6/forward",
-               f"{basePath}Validation/FullPhantom2/Images/7/forward",
-               f"{basePath}Validation/FullPhantom2/Images/8/forward"]
-    stepSkips = 3
-    scaleFactors = 1.0
-    fiducialList = ["B_1_Curve", "B_2_Curve", "B_3_Curve", "B_4_Curve", "B_5_Curve", "B_6_Curve", "B_7_Curve", "B_8_Curve", "C_1_Curve", "C_2_Curve", "C_3_Curve", "C_4_Curve", "C_5_Curve", "C_6_Curve", "C_7_Curve", "C_8_Curve", "D_1_Curve", "D_2_Curve", "D_3_Curve", "D_4_Curve", "D_5_Curve", "D_6_Curve", "D_7_Curve", "D_8_Curve", "E_1_Curve", "E_2_Curve", "E_3_Curve", "E_4_Curve", "E_5_Curve", "E_6_Curve", "E_7_Curve", "E_8_Curve", "G_1_Curve", "G_2_Curve", "G_3_Curve", "G_4_Curve", "G_5_Curve", "G_6_Curve", "G_7_Curve", "G_8_Curve"]
-    stepStartOffset = 100
-
-    # # Rigid Phantom 1
-    # dataPaths = [f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/B_SelfSupervised-ArtifactRemoval-NoPoseLoss-LongtermLoss/Output/7/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/C_SelfSupervised-ArtifactRemoval-NoPoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/5/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/E_SelfSupervised-ArtifactRemoval-PoseLoss-NoLongtermLoss/Output/7/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-    #              f"{basePath}Model_Results/RigidPhantom1/G_SelfSupervised-NoArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3"]
-    # gtPaths = [f"{basePath}Validation/RigidPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward"]
-    # stepSkips = 3
-    # scaleFactors = 1.0
-    # fiducialList = ["B_1_Curve", "B_3_Curve", "B_5_Curve", "B_7_Curve", "C_1_Curve", "C_3_Curve", "C_5_Curve", "C_7_Curve", "D_1_Curve", "D_3_Curve", "D_5_Curve", "D_7_Curve", "E_1_Curve", "E_3_Curve", "E_5_Curve", "E_7_Curve", "G_1_Curve", "G_3_Curve", "G_5_Curve", "G_7_Curve"]
-    # stepStartOffset = 1
-
 
     self.delayDisplay("<h2>Clearing Previous Results</h2>")
     for fiducialListName in fiducialList:
@@ -1527,32 +1368,32 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
   #   # fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_2_CenterCorrection", "D_3_CenterCorrection", "D_4_CenterCorrection"] 
   #   # stepStartOffset = 1
 
-  #   # # Full Phantom 2
-  #   # dataPaths = [f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/6/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/8/forward/frequency_3"]
-  #   # gtPaths = [f"{basePath}Validation/FullPhantom2/Images/1/forward",
-  #   #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
-  #   #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
-  #   #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
-  #   #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
-  #   #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
-  #   #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
-  #   #            f"{basePath}Validation/FullPhantom2/Images/8/forward"]
-  #   # stepSkips = [3, 3, 3, 3]
-  #   # scaleFactors = [18.33, 16.76, 24.75, 23.12, 17.02, 17.65, 20.48, 22.35]
-  #   # nudgeIntervals = [3, 3, 3, 3]
-  #   # nudgeFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
-  #   # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
-  #   # initial_ICPs = ["Initial_ICP_1", "Initial_ICP_2", "Initial_ICP_3", "Initial_ICP_4", "Initial_ICP_5", "Initial_ICP_6", "Initial_ICP_7", "Initial_ICP_8"]
-  #   # fiducialListPoseOnly = ["D_1_PoseOnly", "D_2_PoseOnly", "D_3_PoseOnly", "D_4_PoseOnly", "D_5_PoseOnly", "D_6_PoseOnly", "D_7_PoseOnly", "D_8_PoseOnly"]
-  #   # fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_2_CenterCorrection", "D_3_CenterCorrection", "D_4_CenterCorrection", "D_5_CenterCorrection", "D_6_CenterCorrection", "D_7_CenterCorrection", "D_8_CenterCorrection"] 
-  #   # stepStartOffset = 100
+    # Full Phantom 2
+    dataPaths = [f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/2/forward/frequency_3",
+                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/4/forward/frequency_3",
+                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/6/forward/frequency_3",
+                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3",
+                 f"{basePath}Model_Results/FullPhantom2/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/8/forward/frequency_3"]
+    gtPaths = [f"{basePath}Validation/FullPhantom2/Images/1/forward",
+               f"{basePath}Validation/FullPhantom2/Images/2/forward",
+               f"{basePath}Validation/FullPhantom2/Images/3/forward",
+               f"{basePath}Validation/FullPhantom2/Images/4/forward",
+               f"{basePath}Validation/FullPhantom2/Images/5/forward",
+               f"{basePath}Validation/FullPhantom2/Images/6/forward",
+               f"{basePath}Validation/FullPhantom2/Images/7/forward",
+               f"{basePath}Validation/FullPhantom2/Images/8/forward"]
+    stepSkips = [3, 3, 3, 3]
+    scaleFactors = [18.33, 16.76, 24.75, 23.12, 17.02, 17.65, 20.48, 22.35]
+    nudgeIntervals = [3, 3, 3, 3]
+    nudgeFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
+    nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
+    initial_ICPs = ["Initial_ICP_1", "Initial_ICP_2", "Initial_ICP_3", "Initial_ICP_4", "Initial_ICP_5", "Initial_ICP_6", "Initial_ICP_7", "Initial_ICP_8"]
+    fiducialListPoseOnly = ["D_1_PoseOnly", "D_2_PoseOnly", "D_3_PoseOnly", "D_4_PoseOnly", "D_5_PoseOnly", "D_6_PoseOnly", "D_7_PoseOnly", "D_8_PoseOnly"]
+    fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_2_CenterCorrection", "D_3_CenterCorrection", "D_4_CenterCorrection", "D_5_CenterCorrection", "D_6_CenterCorrection", "D_7_CenterCorrection", "D_8_CenterCorrection"] 
+    stepStartOffset = 100
 
   #   # # Rigid Phantom 1
   #   # dataPaths = [f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
@@ -1726,96 +1567,3 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
     widget.parent.deleteLater()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # # A_cGAN
-    # # Box Phantom 1
-    # dataPaths = [f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/1",
-    #              f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/2",
-    #              f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/3",
-    #              f"{basePath}Model_Results/BoxPhantom1/A_cGAN/Output/4"]
-    # gtPaths = [f"{basePath}Validation/BoxPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom1/Images/4/forward"]
-    # stepSkips = [3, 3, 3, 3]
-    # scaleFactors = [22.85, 27.11, 20.49, 21.18]
-    # nudgeIntervals = [3, 3, 3, 3]
-    # nudgeFactors = [0.5, 0.5, 1.5, 1.5]
-    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5]
-    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
-    # fiducialListPoseOnly = ["A_1", "A_2", "A_3", "A_4"]
-    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A"]
-
-    # # Box Phantom 2
-    # dataPaths = [f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/1",
-    #              f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/2",
-    #              f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/3",
-    #              f"{basePath}Model_Results/BoxPhantom2/A_cGAN/Output/4"]
-    # gtPaths = [f"{basePath}Validation/BoxPhantom2/Images/1/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/2/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/3/forward",
-    #            f"{basePath}Validation/BoxPhantom2/Images/4/forward"]
-    # stepSkips = [3, 3, 3, 3]
-    # scaleFactors = [15.60, 15.49, 24.95, 20.03]
-    # nudgeIntervals = [3, 3, 3, 3]
-    # nudgeFactors = [0.5, 0.5, 1.5, 1.5]
-    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5]
-    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
-    # fiducialListPoseOnly = ["A_1", "A_2", "A_3", "A_4"]
-    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A"] 
-
-    # # Full Phantom 2
-    # dataPaths = [f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/1",
-    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/2",
-    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/3",
-    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/4",
-    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/5",
-    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/6",
-    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/7",
-    #              f"{basePath}Model_Results/FullPhantom2/A_cGAN/Output/8"]
-    # gtPaths = [f"{basePath}Validation/FullPhantom2/Images/1/forward",
-    #            f"{basePath}Validation/FullPhantom2/Images/2/forward",
-    #            f"{basePath}Validation/FullPhantom2/Images/3/forward",
-    #            f"{basePath}Validation/FullPhantom2/Images/4/forward",
-    #            f"{basePath}Validation/FullPhantom2/Images/5/forward",
-    #            f"{basePath}Validation/FullPhantom2/Images/6/forward",
-    #            f"{basePath}Validation/FullPhantom2/Images/7/forward",
-    #            f"{basePath}Validation/FullPhantom2/Images/8/forward"]
-    # stepSkips = [3, 3, 3, 3]
-    # scaleFactors = [18.33, 16.76, 24.75, 23.12, 17.02, 17.65, 20.48, 22.35]
-    # nudgeIntervals = [3, 3, 3, 3]
-    # nudgeFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
-    # nudgeRotationFactors = [0.5, 0.5, 1.5, 1.5, 0.5, 0.5, 1.5, 1.5]
-    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
-    # fiducialListPoseOnly = ["A_1", "A_2", "A_3", "A_4", "A_5", "A_6", "A_7", "A_8"]
-    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"] 
-
-    # # Rigid Phantom 1
-    # dataPaths = [f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/1",
-    #              f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/3",
-    #              f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/5",
-    #              f"{basePath}Model_Results/RigidPhantom1/A_cGAN/Output/7"]
-    # gtPaths = [f"{basePath}Validation/RigidPhantom1/Images/1/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
-    #            f"{basePath}Validation/RigidPhantom1/Images/7/forward"]
-    # stepSkips = [3, 3, 3, 3]
-    # scaleFactors = [18.54, 14.63, 18.13, 19.84]
-    # nudgeIntervals = [3, 3, 3, 3]
-    # nudgeFactors = [0.5, 1.5, 0.5, 1.5]
-    # nudgeRotationFactors = [0.5, 1.5, 0.5, 1.5]
-    # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
-    # fiducialListPoseOnly = ["A_1", "A_3", "A_5", "A_7"]
-    # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A"]    
