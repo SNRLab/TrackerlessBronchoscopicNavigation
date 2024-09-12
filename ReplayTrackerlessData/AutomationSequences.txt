@@ -315,3 +315,14 @@
     # initial_ICPs = ["Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I", "Initial_ICP_I"]
     # fiducialListPoseOnly = ["A_1", "A_3", "A_5", "A_7"]
     # fiducialListCenterCorrection = ["N/A", "N/A", "N/A", "N/A"]    
+
+    self.delayDisplay("<h2>Clearing Previous Results</h2>")
+    for fiducialListName in fiducialList:
+      fiducialPoseOnlyNode = slicer.util.getNode(fiducialListName)
+      fiducialPoseOnlyNode.RemoveAllControlPoints()
+
+    self.delayDisplay("<h2>Starting Curves</h2>")
+    for idx in range(len(dataPaths)):
+      self.runCurveModule(dataPaths[idx], gtPaths[idx], stepSkips, scaleFactors, "Initial_ICP_I", fiducialList[idx], stepStartOffset)
+
+    slicer.util.selectModule('ReplayTrackerlessData')    

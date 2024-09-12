@@ -1312,7 +1312,6 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
 
     basePath = "G:/Partners HealthCare Dropbox/Franklin King/SNRLabDisk/Projects/CanonProj/TrackerlessNavigation/ExperimentResults/"
 
-
   # # for replaying data
   # def runTest(self):
   #   slicer.util.selectModule('CurveMaker')
@@ -1385,24 +1384,24 @@ class ReplayTrackerlessDataTest(ScriptedLoadableModuleTest):
     fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_2_CenterCorrection", "D_3_CenterCorrection", "D_4_CenterCorrection", "D_5_CenterCorrection", "D_6_CenterCorrection", "D_7_CenterCorrection", "D_8_CenterCorrection"] 
     stepStartOffset = 100
 
-  #   # # Rigid Phantom 1
-  #   # dataPaths = [f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
-  #   #              f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3"]
-  #   # gtPaths = [f"{basePath}Validation/RigidPhantom1/Images/1/forward",
-  #   #            f"{basePath}Validation/RigidPhantom1/Images/3/forward",
-  #   #            f"{basePath}Validation/RigidPhantom1/Images/5/forward",
-  #   #            f"{basePath}Validation/RigidPhantom1/Images/7/forward"]
-  #   # stepSkips = [3, 3, 3, 3]
-  #   # scaleFactors = [18.54, 14.63, 18.13, 19.84]
-  #   # nudgeIntervals = [3, 3, 3, 3]
-  #   # nudgeFactors = [0.5, 1.5, 0.5, 1.5]
-  #   # nudgeRotationFactors = [0.5, 1.5, 0.5, 1.5]
-  #   # initial_ICPs = ["Initial_ICP_1", "Initial_ICP_3", "Initial_ICP_5", "Initial_ICP_7"]
-  #   # fiducialListPoseOnly = ["D_1_PoseOnly", "D_3_PoseOnly", "D_5_PoseOnly", "D_7_PoseOnly"]
-  #   # fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_3_CenterCorrection", "D_5_CenterCorrection", "D_7_CenterCorrection"]
-  #   # stepStartOffset = 1
+    # # Rigid Phantom 1
+    # dataPaths = [f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/1/forward/frequency_3",
+                 # f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/3/forward/frequency_3",
+                 # f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/5/forward/frequency_3",
+                 # f"{basePath}Model_Results/RigidPhantom1/D_SelfSupervised-ArtifactRemoval-PoseLoss-LongtermLoss/Output/7/forward/frequency_3"]
+    # gtPaths = [f"{basePath}Validation/RigidPhantom1/Images/1/forward",
+               # f"{basePath}Validation/RigidPhantom1/Images/3/forward",
+               # f"{basePath}Validation/RigidPhantom1/Images/5/forward",
+               # f"{basePath}Validation/RigidPhantom1/Images/7/forward"]
+    # stepSkips = [3, 3, 3, 3]
+    # scaleFactors = [18.54, 14.63, 18.13, 19.84]
+    # nudgeIntervals = [3, 3, 3, 3]
+    # nudgeFactors = [0.5, 1.5, 0.5, 1.5]
+    # nudgeRotationFactors = [0.5, 1.5, 0.5, 1.5]
+    # initial_ICPs = ["Initial_ICP_1", "Initial_ICP_3", "Initial_ICP_5", "Initial_ICP_7"]
+    # fiducialListPoseOnly = ["D_1_PoseOnly", "D_3_PoseOnly", "D_5_PoseOnly", "D_7_PoseOnly"]
+    # fiducialListCenterCorrection = ["D_1_CenterCorrection", "D_3_CenterCorrection", "D_5_CenterCorrection", "D_7_CenterCorrection"]
+    # stepStartOffset = 1
 
 
     self.delayDisplay("<h2>Clearing Previous Results</h2>")
