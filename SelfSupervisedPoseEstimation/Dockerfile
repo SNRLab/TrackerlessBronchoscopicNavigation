@@ -1,10 +1,4 @@
 
-
-# FROM pytorch/pytorch:1.9.0-cuda10.2-cudnn7-runtime
-
-# FROM pytorch/pytorch:1.13.1-cuda11.6-cudnn8-runtime
-
-#FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
 FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
 # Set up environment variable, Important to use gpu in the container 
