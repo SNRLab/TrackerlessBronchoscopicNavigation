@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below, and cite the related paper listed under preferred-citation."
+type: software
+title: "TrackerlessBronchoscopicNavigation"
+abstract: >-
+  3D Slicer modules for vision-based (trackerless) navigated bronchoscopy:
+  recording and replaying bronchoscope video, generating depth maps from
+  bronchoscopic images, self-supervised camera pose estimation, centerline
+  computation, and trajectory analysis.
+authors:
+  - given-names: Franklin
+    family-names: King
+    orcid: "https://orcid.org/0000-0003-4381-4242"
+    affiliation: "Brigham and Women's Hospital, Harvard Medical School"
+  - given-names: Megha
+    family-names: Kalia
+    affiliation: "Brigham and Women's Hospital, Harvard Medical School"
+repository-code: "https://github.com/SNRLab/TrackerlessBronchoscopicNavigation"
+license-url: "https://github.com/SNRLab/TrackerlessBronchoscopicNavigation/blob/main/License.txt"
+keywords:
+  - 3D Slicer
+  - bronchoscopy
+  - surgical navigation
+  - depth estimation
+  - pose estimation
+preferred-citation:
+  type: article
+  title: "Self-supervised direct pose estimation for vision-based tracking in navigated bronchoscopy"
+  authors:
+    - given-names: Megha
+      family-names: Kalia
+    - given-names: Franklin
+      family-names: King
+      orcid: "https://orcid.org/0000-0003-4381-4242"
+    - given-names: Fumitaro
+      family-names: Masaki
+    - given-names: Nobuhiko
+      family-names: Hata
+  journal: "Computers in Biology and Medicine"
+  volume: 197
+  start: 110958
+  year: 2025
+  doi: "10.1016/j.compbiomed.2025.110958"
