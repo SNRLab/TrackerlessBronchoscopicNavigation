@@ -10,7 +10,6 @@ import torch
 import math
 from sys import platform
 from PIL import Image
-from Resources import layers
 import re
 import json
 import time

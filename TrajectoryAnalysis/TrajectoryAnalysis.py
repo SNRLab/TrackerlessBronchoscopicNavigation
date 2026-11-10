@@ -7,7 +7,6 @@ from slicer.ScriptedLoadableModule import *
 import numpy as np
 import math
 from sys import platform
-from Resources import layers
 import statistics
 import csv
 
