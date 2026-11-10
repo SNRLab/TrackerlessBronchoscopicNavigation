@@ -11,10 +11,10 @@ authors:
   - given-names: Franklin
     family-names: King
     orcid: "https://orcid.org/0000-0003-4381-4242"
-    affiliation: "Brigham and Women's Hospital, Harvard Medical School"
+    affiliation: "Brigham and Women's Hospital"
   - given-names: Megha
     family-names: Kalia
-    affiliation: "Brigham and Women's Hospital, Harvard Medical School"
+    affiliation: "Brigham and Women's Hospital"
 repository-code: "https://github.com/SNRLab/TrackerlessBronchoscopicNavigation"
 license-url: "https://github.com/SNRLab/TrackerlessBronchoscopicNavigation/blob/main/License.txt"
 keywords:
